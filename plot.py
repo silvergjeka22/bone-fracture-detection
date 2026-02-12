@@ -1,7 +1,6 @@
 class PlotVisualizer:
     
     def __init__(self):
-        """Initialize the PlotVisualizer."""
         pass
     
     def plot_split_distribution(self, all_stats, save_path='split_distribution.png'):
