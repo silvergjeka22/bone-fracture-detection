@@ -8,10 +8,8 @@ for binary classification of bone fracture images.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .base import BaseModel
 
-
-class BoneFractureCNN(BaseModel):
+class BoneFractureCNN(nn.Module):
     """
     2D Convolutional Neural Network for Bone Fracture Classification
     Architecture: 4 conv layers with increasing filters [32, 64, 128, 256]

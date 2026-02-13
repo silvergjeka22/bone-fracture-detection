@@ -12,13 +12,12 @@ TODO: Implement ScatNet architecture
 
 import torch
 import torch.nn as nn
-from .base import BaseModel
 
 # Uncomment when implementing:
 # from kymatio.torch import Scattering2D
 
 
-class BoneFractureScatNet(BaseModel):
+class BoneFractureScatNet(nn.Module):
     """
     Scattering Network for Bone Fracture Classification
     

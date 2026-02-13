@@ -8,10 +8,9 @@ This module contains transfer learning models based on popular architectures
 import torch
 import torch.nn as nn
 from torchvision import models
-from .base import BaseModel
 
 
-class BoneFractureResNet18(BaseModel):
+class BoneFractureResNet18(nn.Module):
     """
     ResNet18 for Bone Fracture Classification
     Uses pre-trained weights from ImageNet

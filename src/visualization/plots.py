@@ -383,45 +383,45 @@ class PlotVisualizer:
 
     def visualize_confusion_matrix(self, test_labels, test_preds, class_names, 
                                model_name="Model", save_path=None):
-    """
-    Create and visualize confusion matrix with annotations.
-    
-    Args:
-        test_labels: True labels
-        test_preds: Predicted labels
-        class_names: List of class names
-        model_name: Name of the model for the title
-        save_path: Path to save the figure (optional)
-    """
-    
-    # Calculate confusion matrix
-    cm = confusion_matrix(test_labels, test_preds)
-    
-    # Create figure
-    plt.figure(figsize=(10, 8))
-    
-    # Create heatmap
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=class_names, yticklabels=class_names,
-                cbar_kws={'label': 'Count'},
-                linewidths=2, linecolor='black')
-    
-    plt.title(f'Confusion Matrix - {model_name}', fontsize=16, fontweight='bold', pad=20)
-    plt.ylabel('True Label', fontsize=13, fontweight='bold')
-    plt.xlabel('Predicted Label', fontsize=13, fontweight='bold')
-    
-    # Add percentage annotations
-    total = np.sum(cm)
-    for i in range(len(class_names)):
-        for j in range(len(class_names)):
-            percentage = cm[i, j] / total * 100
-            plt.text(j + 0.5, i + 0.7, f'({percentage:.1f}%)', 
-                    ha='center', va='center', fontsize=10, color='red')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Confusion matrix saved: {save_path}")
-    
-    plt.show()
+        """
+        Create and visualize confusion matrix with annotations.
+        
+        Args:
+            test_labels: True labels
+            test_preds: Predicted labels
+            class_names: List of class names
+            model_name: Name of the model for the title
+            save_path: Path to save the figure (optional)
+        """
+        
+        # Calculate confusion matrix
+        cm = confusion_matrix(test_labels, test_preds)
+        
+        # Create figure
+        plt.figure(figsize=(10, 8))
+        
+        # Create heatmap
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                    xticklabels=class_names, yticklabels=class_names,
+                    cbar_kws={'label': 'Count'},
+                    linewidths=2, linecolor='black')
+        
+        plt.title(f'Confusion Matrix - {model_name}', fontsize=16, fontweight='bold', pad=20)
+        plt.ylabel('True Label', fontsize=13, fontweight='bold')
+        plt.xlabel('Predicted Label', fontsize=13, fontweight='bold')
+        
+        # Add percentage annotations
+        total = np.sum(cm)
+        for i in range(len(class_names)):
+            for j in range(len(class_names)):
+                percentage = cm[i, j] / total * 100
+                plt.text(j + 0.5, i + 0.7, f'({percentage:.1f}%)', 
+                        ha='center', va='center', fontsize=10, color='red')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Confusion matrix saved: {save_path}")
+        
+        plt.show()
