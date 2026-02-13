@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pandas as pd
 from PIL import Image
-
+from sklearn.metrics import f1_score, classification_report, confusion_matrix
 
 class DatasetPrinter:
     """
@@ -181,8 +181,7 @@ class DatasetPrinter:
         test_preds: Predicted labels
         class_names: List of class names
     """
-    from sklearn.metrics import f1_score, classification_report, confusion_matrix
-    
+
     # F1 Score
     f1 = f1_score(test_labels, test_preds, average='binary')
     print("\n" + "="*70)

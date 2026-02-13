@@ -3,6 +3,9 @@ import numpy as np
 from PIL import Image
 import os
 import random
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class PlotVisualizer:
     
@@ -335,8 +338,6 @@ class PlotVisualizer:
             all_results: Dictionary with model results
             save_path: Path to save the figure
         """
-        import matplotlib.pyplot as plt
-        import numpy as np
         
         fig, axes = plt.subplots(1, 2, figsize=(18, 6))
         
@@ -392,10 +393,6 @@ class PlotVisualizer:
         model_name: Name of the model for the title
         save_path: Path to save the figure (optional)
     """
-    from sklearn.metrics import confusion_matrix
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import numpy as np
     
     # Calculate confusion matrix
     cm = confusion_matrix(test_labels, test_preds)
