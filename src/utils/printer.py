@@ -11,16 +11,7 @@ class DatasetPrinter:
     Handles analysis and visualization of image datasets split into train/val/test.
     """
 
-    def __init__(self, base_path=None):
-        """
-        Initialize the DatasetPrinter.
-
-        Args:
-            base_path: Optional base path for the dataset
-        """
-        self.base_path = base_path
-
-    def print_split_summary(self, base_path, train_path, val_path, test_path):
+    def print_split_summary(base_path, train_path, val_path, test_path):
         """
         Prints the number of images based on train/test/val splits.
 
@@ -41,7 +32,7 @@ class DatasetPrinter:
                                          if f.endswith(('.png', '.jpg', '.jpeg'))])
                         print(f" {cls}: {num_images} images")
 
-    def analyze_split(self, split_path, split_name):
+    def analyze_split(split_path, split_name):
         """
         Analyze one split (train/val/test) and return statistics.
 
@@ -93,7 +84,7 @@ class DatasetPrinter:
 
         return stats
 
-    def print_all_stats(self, all_stats):
+    def print_all_stats(all_stats):
         """
         Prints all statistics info based on train/val/test splits.
 
@@ -118,7 +109,7 @@ class DatasetPrinter:
         total_all = sum(s['total'] for s in all_stats)
         print(f"\nTOTAL DATASET: {total_all:,} images")
 
-    def print_summary_table(self, all_stats):
+    def print_summary_table(all_stats):
         """
         Print summary statistics table.
 
@@ -157,7 +148,7 @@ class DatasetPrinter:
         """
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    def print_all_info(self, all_stats, train_path, val_path, test_path):
+    def print_all_info(base_path, all_stats, train_path, val_path, test_path):
         """
         Print all information including split summary, stats, and summary table.
 
@@ -167,12 +158,12 @@ class DatasetPrinter:
             val_path: Path to validation data
             test_path: Path to test data
         """
-        self.print_split_summary(self.base_path, train_path, val_path, test_path)
-        self.print_all_stats(all_stats)
-        self.print_summary_table(all_stats)
+        print_split_summary(base_path, train_path, val_path, test_path)
+        print_all_stats(all_stats)
+        print_summary_table(all_stats)
 
     
-    def print_detailed_metrics(self, test_labels, test_preds, class_names):
+    def print_detailed_metrics(test_labels, test_preds, class_names):
         """
         Print detailed classification metrics including F1, classification report, and confusion matrix.
         

@@ -9,10 +9,7 @@ import seaborn as sns
 
 class PlotVisualizer:
     
-    def __init__(self):
-        pass
-    
-    def plot_split_distribution(self, all_stats, save_path='split_distribution.png'):
+    def plot_split_distribution(all_stats, save_path='split_distribution.png'):
         """Plot dataset split distribution (train/val/test) as bar and pie charts."""
         fig, axes = plt.subplots(1, 2, figsize=(15, 5))
         
@@ -43,7 +40,7 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def plot_class_distribution_per_split(self, all_stats, save_path='class_per_split.png'):
+    def plot_class_distribution_per_split(all_stats, save_path='class_per_split.png'):
         """Plot class distribution for each split (train/val/test)."""
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
         
@@ -70,7 +67,7 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def plot_stacked_distribution(self, all_stats, save_path='stacked_distribution.png'):
+    def plot_stacked_distribution(all_stats, save_path='stacked_distribution.png'):
         """Plot stacked bar chart showing class distribution across splits."""
         fig, ax = plt.subplots(figsize=(12, 6))
         
@@ -115,7 +112,7 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def plot_dimensions_analysis(self, all_stats, save_path='dimensions_analysis.png'):
+    def plot_dimensions_analysis(all_stats, save_path='dimensions_analysis.png'):
         """Plot image dimension histograms for each split."""
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         colors_splits = ['#FF6B6B', '#4ECDC4', '#95E1D3']
@@ -150,7 +147,7 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def plot_sample_images(self, train_path, val_path, test_path, save_path='sample_images.png'):
+    def plot_sample_images(train_path, val_path, test_path, save_path='sample_images.png'):
         """Display sample images from each split."""
         fig, axes = plt.subplots(3, 6, figsize=(18, 9))
         
@@ -188,7 +185,7 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def plot_class_balance(self, all_stats, save_path='class_balance.png'):
+    def plot_class_balance(all_stats, save_path='class_balance.png'):
         """Plot class balance ratios across splits."""
         fig, ax = plt.subplots(figsize=(12, 6))
         colors_splits = ['#FF6B6B', '#4ECDC4', '#95E1D3']
@@ -230,16 +227,16 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
-    def generate_all_plots(self, all_stats, train_path, val_path, test_path):
+    def generate_all_plots(all_stats, train_path, val_path, test_path):
         """Generate all dataset visualization plots at once."""
-        self.plot_split_distribution(all_stats)
-        self.plot_class_distribution_per_split(all_stats)
-        self.plot_stacked_distribution(all_stats)
-        self.plot_dimensions_analysis(all_stats)
-        self.plot_sample_images(train_path, val_path, test_path)
-        self.plot_class_balance(all_stats)
+        plot_split_distribution(all_stats)
+        plot_class_distribution_per_split(all_stats)
+        plot_stacked_distribution(all_stats)
+        plot_dimensions_analysis(all_stats)
+        plot_sample_images(train_path, val_path, test_path)
+        plot_class_balance(all_stats)
     
-    def visualize_batch(self, train_loader, train_dataset, num_images=8, figsize=(15, 7)):
+    def visualize_batch(train_loader, train_dataset, num_images=8, figsize=(15, 7)):
         """Visualize a batch of images from the training DataLoader."""
         images, labels = next(iter(train_loader))
         
@@ -266,7 +263,7 @@ class PlotVisualizer:
         plt.tight_layout()
         plt.show()
     
-    def visualize_filters(self, model, layer_name='conv1', save_path='cnn_filters.png'):
+    def visualize_filters(model, layer_name='conv1', save_path='cnn_filters.png'):
         """Visualize filters from the first convolutional layer."""
         filters = model.get_conv1_filters().cpu().numpy()
         
@@ -292,7 +289,7 @@ class PlotVisualizer:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
-    def plot_kfold_history(self, fold_histories, save_path='cnn_kfold_training.png'):
+    def plot_kfold_history(fold_histories, save_path='cnn_kfold_training.png'):
         """Plot training history for all folds."""
         fig, axes = plt.subplots(1, 2, figsize=(16, 5))
         
@@ -381,7 +378,7 @@ class PlotVisualizer:
         
         print(f"\nSaved: {save_path}")
 
-    def visualize_confusion_matrix(self, test_labels, test_preds, class_names, 
+    def visualize_confusion_matrix(test_labels, test_preds, class_names, 
                                model_name="Model", save_path=None):
         """
         Create and visualize confusion matrix with annotations.
