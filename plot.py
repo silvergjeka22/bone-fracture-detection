@@ -325,3 +325,106 @@ class PlotVisualizer:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
         print(f"\nSaved: {save_path}")
+
+
+    def visualize_model_comparison(all_results, save_path='cnn_models_comparison.png'):
+        """
+        Visualize comparison of multiple models with mean accuracy bars and learning curves.
+        
+        Args:
+            all_results: Dictionary with model results
+            save_path: Path to save the figure
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        fig, axes = plt.subplots(1, 2, figsize=(18, 6))
+        
+        model_names = list(all_results.keys())
+        mean_accs = [all_results[m]['mean_acc'] for m in model_names]
+        std_accs = [all_results[m]['std_acc'] for m in model_names]
+        
+        colors = ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA']
+        bars = axes[0].bar(model_names, mean_accs, color=colors, edgecolor='black', linewidth=2)
+        axes[0].errorbar(model_names, mean_accs, yerr=std_accs, fmt='none',
+                        ecolor='black', capsize=8, linewidth=2)
+        axes[0].set_ylabel('Mean Validation Accuracy', fontweight='bold', fontsize=13)
+        axes[0].set_title('K-Fold CV Mean Accuracy Comparison', fontweight='bold', fontsize=15)
+        axes[0].set_ylim([min(mean_accs)-0.05, 1.0])
+        axes[0].grid(axis='y', alpha=0.3)
+        axes[0].tick_params(axis='x', rotation=15)
+        
+        for bar, acc, std in zip(bars, mean_accs, std_accs):
+            height = bar.get_height()
+            axes[0].text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{acc:.4f}\n±{std:.4f}',
+                        ha='center', va='bottom', fontweight='bold', fontsize=9)
+        
+        for idx, (model_name, results) in enumerate(all_results.items()):
+            best_fold_idx = np.argmax([r['best_val_acc'] for r in results['fold_results']])
+            history = results['fold_histories'][best_fold_idx]
+            
+            epochs = range(1, len(history['val_acc']) + 1)
+            axes[1].plot(epochs, history['val_acc'], label=model_name,
+                        linewidth=2.5, color=colors[idx], alpha=0.8)
+        
+        axes[1].set_xlabel('Epoch', fontweight='bold', fontsize=13)
+        axes[1].set_ylabel('Validation Accuracy', fontweight='bold', fontsize=13)
+        axes[1].set_title('Learning Curves (Best Fold)', fontweight='bold', fontsize=15)
+        axes[1].legend(fontsize=10, loc='lower right')
+        axes[1].grid(alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        print(f"\nSaved: {save_path}")
+
+    def visualize_confusion_matrix(self, test_labels, test_preds, class_names, 
+                               model_name="Model", save_path=None):
+    """
+    Create and visualize confusion matrix with annotations.
+    
+    Args:
+        test_labels: True labels
+        test_preds: Predicted labels
+        class_names: List of class names
+        model_name: Name of the model for the title
+        save_path: Path to save the figure (optional)
+    """
+    from sklearn.metrics import confusion_matrix
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    
+    # Calculate confusion matrix
+    cm = confusion_matrix(test_labels, test_preds)
+    
+    # Create figure
+    plt.figure(figsize=(10, 8))
+    
+    # Create heatmap
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=class_names, yticklabels=class_names,
+                cbar_kws={'label': 'Count'},
+                linewidths=2, linecolor='black')
+    
+    plt.title(f'Confusion Matrix - {model_name}', fontsize=16, fontweight='bold', pad=20)
+    plt.ylabel('True Label', fontsize=13, fontweight='bold')
+    plt.xlabel('Predicted Label', fontsize=13, fontweight='bold')
+    
+    # Add percentage annotations
+    total = np.sum(cm)
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            percentage = cm[i, j] / total * 100
+            plt.text(j + 0.5, i + 0.7, f'({percentage:.1f}%)', 
+                    ha='center', va='center', fontsize=10, color='red')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Confusion matrix saved: {save_path}")
+    
+    plt.show()

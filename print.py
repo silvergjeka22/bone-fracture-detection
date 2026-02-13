@@ -170,3 +170,53 @@ class DatasetPrinter:
         self.print_split_summary(self.base_path, train_path, val_path, test_path)
         self.print_all_stats(all_stats)
         self.print_summary_table(all_stats)
+
+    
+    def print_detailed_metrics(self, test_labels, test_preds, class_names):
+    """
+    Print detailed classification metrics including F1, classification report, and confusion matrix.
+    
+    Args:
+        test_labels: True labels
+        test_preds: Predicted labels
+        class_names: List of class names
+    """
+    from sklearn.metrics import f1_score, classification_report, confusion_matrix
+    
+    # F1 Score
+    f1 = f1_score(test_labels, test_preds, average='binary')
+    print("\n" + "="*70)
+    print("DETAILED CLASSIFICATION METRICS")
+    print("="*70)
+    print(f"\nTest F1 Score: {f1:.4f}")
+    
+    # Classification Report
+    print("\nClassification Report:")
+    print(classification_report(test_labels, test_preds, target_names=class_names))
+    
+    # Confusion Matrix
+    cm = confusion_matrix(test_labels, test_preds)
+    print("\nConfusion Matrix:")
+    print(cm)
+    print()
+    
+    # Detailed breakdown
+    tn, fp, fn, tp = cm.ravel()
+    print("Confusion Matrix Breakdown:")
+    print(f"  True Negatives  (TN): {tn}")
+    print(f"  False Positives (FP): {fp}")
+    print(f"  False Negatives (FN): {fn}")
+    print(f"  True Positives  (TP): {tp}")
+    
+    # Additional metrics
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    
+    print(f"\nAdditional Metrics:")
+    print(f"  Accuracy:    {accuracy:.4f}")
+    print(f"  Precision:   {precision:.4f}")
+    print(f"  Recall:      {recall:.4f}")
+    print(f"  Specificity: {specificity:.4f}")
+    print("="*70)
