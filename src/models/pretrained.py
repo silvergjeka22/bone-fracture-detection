@@ -41,7 +41,7 @@ class BoneFractureResNet18(nn.Module):
         return self.resnet.conv1.weight.data.clone()
 
 
-class BoneFractureResNet50(BaseModel):
+class BoneFractureResNet50(nn.Module):
     """
     ResNet50 for Bone Fracture Classification
     Uses pre-trained weights from ImageNet
@@ -72,7 +72,7 @@ class BoneFractureResNet50(BaseModel):
         return self.resnet.conv1.weight.data.clone()
 
 
-class BoneFractureVGG16(BaseModel):
+class BoneFractureVGG16(nn.Module):
     """
     VGG16 for Bone Fracture Classification
     Uses pre-trained weights from ImageNet
@@ -103,7 +103,7 @@ class BoneFractureVGG16(BaseModel):
         return self.vgg.features[0].weight.data.clone()
 
 
-class BoneFractureVGG19(BaseModel):
+class BoneFractureVGG19(nn.Module):
     """
     VGG19 for Bone Fracture Classification
     Uses pre-trained weights from ImageNet
