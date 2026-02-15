@@ -10,7 +10,7 @@ class DatasetPrinter:
     A utility class for printing dataset statistics and summaries.
     Handles analysis and visualization of image datasets split into train/val/test.
     """
-
+    @staticmethod
     def print_split_summary(base_path, train_path, val_path, test_path):
         """
         Prints the number of images based on train/test/val splits.
@@ -32,6 +32,7 @@ class DatasetPrinter:
                                          if f.endswith(('.png', '.jpg', '.jpeg'))])
                         print(f" {cls}: {num_images} images")
 
+    @staticmethod
     def analyze_split(split_path, split_name):
         """
         Analyze one split (train/val/test) and return statistics.
@@ -84,6 +85,7 @@ class DatasetPrinter:
 
         return stats
 
+    @staticmethod
     def print_all_stats(all_stats):
         """
         Prints all statistics info based on train/val/test splits.
@@ -109,6 +111,7 @@ class DatasetPrinter:
         total_all = sum(s['total'] for s in all_stats)
         print(f"\nTOTAL DATASET: {total_all:,} images")
 
+    @staticmethod 
     def print_summary_table(all_stats):
         """
         Print summary statistics table.
@@ -148,6 +151,7 @@ class DatasetPrinter:
         """
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+    @staticmethod
     def print_all_info(base_path, all_stats, train_path, val_path, test_path):
         """
         Print all information including split summary, stats, and summary table.
@@ -158,11 +162,11 @@ class DatasetPrinter:
             val_path: Path to validation data
             test_path: Path to test data
         """
-        print_split_summary(base_path, train_path, val_path, test_path)
-        print_all_stats(all_stats)
-        print_summary_table(all_stats)
+        DatasetPrinter.print_split_summary(base_path, train_path, val_path, test_path)
+        DatasetPrinter.print_all_stats(all_stats)
+        DatasetPrinter.print_summary_table(all_stats)
 
-    
+    @staticmethod
     def print_detailed_metrics(test_labels, test_preds, class_names):
         """
         Print detailed classification metrics including F1, classification report, and confusion matrix.
