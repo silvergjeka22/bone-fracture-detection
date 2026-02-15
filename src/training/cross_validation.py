@@ -15,7 +15,7 @@ from .trainer import train_epoch, validate_epoch
 
 
 def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
-                   batch_size=32, learning_rate=0.001, device='cpu'):
+                   batch_size=32, learning_rate=0.001, dropout_rate=0.5, device='cpu'):
     """
     Train model with k-fold cross-validation.
 
@@ -26,6 +26,7 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
         num_epochs: Number of epochs per fold
         batch_size: Batch size
         learning_rate: Learning rate
+        dropout_rate: Dropout rate for the model (NEW PARAMETER)
         device: Device to train on (cpu/cuda)
 
     Returns:
@@ -64,8 +65,8 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
             val_subsampler, batch_size=batch_size, shuffle=False
         )
 
-        # Initialize model for this fold
-        model = model_class(num_classes=2, dropout_rate=0.5)
+        # Initialize model for this fold (NOW USES dropout_rate PARAMETER)
+        model = model_class(num_classes=2, dropout_rate=dropout_rate)
         model = model.to(device)
 
         # Loss and optimizer
@@ -84,6 +85,7 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
         }
 
         best_val_acc = 0.0
+        best_val_loss = float('inf')
         best_model_wts = copy.deepcopy(model.state_dict())
 
         # Training loop
@@ -108,6 +110,7 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
             # Save best model
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
+                best_val_loss = val_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
 
             # Print progress
@@ -120,22 +123,25 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
         # Load best model weights
         model.load_state_dict(best_model_wts)
 
-        # Store fold results
+        # Store fold results (ADDED best_val_loss)
         fold_results.append({
             'fold': fold + 1,
             'best_val_acc': best_val_acc,
+            'best_val_loss': best_val_loss,
             'final_train_acc': history['train_acc'][-1],
             'model': model
         })
         fold_histories.append(history)
 
-        print(f"\nFold {fold + 1} Best Val Accuracy: {best_val_acc:.4f}")
+        print(f"\nFold {fold + 1} Best Val Accuracy: {best_val_acc:.4f}\n")
 
     # Calculate mean results
     mean_acc = np.mean([r['best_val_acc'] for r in fold_results])
     std_acc = np.std([r['best_val_acc'] for r in fold_results])
 
+    print("="*70)
     print("K-FOLD CROSS-VALIDATION RESULTS")
+    print("="*70)
     for result in fold_results:
         print(f"Fold {result['fold']}: Val Accuracy = {result['best_val_acc']:.4f}")
     print(f"\nMean Val Accuracy: {mean_acc:.4f} ± {std_acc:.4f}")
