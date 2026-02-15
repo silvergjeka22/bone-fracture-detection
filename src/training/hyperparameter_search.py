@@ -6,6 +6,7 @@ This module contains functions for finding optimal hyperparameters using Optuna.
 """
 
 import optuna
+from .cross_validation import train_kfold_cv
 
 
 def optimize_hyperparameters(model_class, train_dataset, device, 
