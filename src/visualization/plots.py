@@ -227,6 +227,15 @@ class PlotVisualizer:
         plt.show()
         print(f"Saved: {save_path}")
     
+    def generate_all_plots(all_stats, train_path, val_path, test_path):
+        """Generate all dataset visualization plots at once."""
+        plot_split_distribution(all_stats)
+        plot_class_distribution_per_split(all_stats)
+        plot_stacked_distribution(all_stats)
+        plot_dimensions_analysis(all_stats)
+        plot_sample_images(train_path, val_path, test_path)
+        plot_class_balance(all_stats)
+    
     def visualize_batch(train_loader, train_dataset, num_images=8, figsize=(15, 7)):
         """Visualize a batch of images from the training DataLoader."""
         images, labels = next(iter(train_loader))
