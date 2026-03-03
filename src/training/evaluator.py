@@ -1,30 +1,8 @@
-"""
-Model evaluation utilities.
-
-This module contains functions for testing models and computing detailed metrics.
-"""
-
 import torch
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 
 def test_model(model, test_loader, criterion, device):
-    """
-    Test model on test set and return detailed metrics.
-    
-    Args:
-        model: PyTorch model
-        test_loader: Test data loader
-        criterion: Loss function
-        device: Device to test on (cpu/cuda)
-        
-    Returns:
-        test_loss: Average test loss
-        test_acc: Test accuracy
-        test_preds: List of predictions
-        test_labels: List of true labels
-        metrics: Dictionary with precision, recall, f1
-    """
     model.eval()
     running_loss = 0.0
     correct = 0

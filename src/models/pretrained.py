@@ -1,21 +1,9 @@
-"""
-Pre-trained models for bone fracture detection.
-
-This module contains transfer learning models based on popular architectures
-(ResNet, VGG) pre-trained on ImageNet and fine-tuned for bone fracture classification.
-"""
-
 import torch
 import torch.nn as nn
 from torchvision import models
 
 
 class BoneFractureResNet18(nn.Module):
-    """
-    ResNet18 for Bone Fracture Classification
-    Uses pre-trained weights from ImageNet
-    """
-
     def __init__(self, num_classes=2, pretrained=True):
         super(BoneFractureResNet18, self).__init__()
 
@@ -37,15 +25,10 @@ class BoneFractureResNet18(nn.Module):
         return self.resnet(x)
 
     def get_conv1_filters(self):
-        """Extract first convolutional layer filters"""
         return self.resnet.conv1.weight.data.clone()
 
 
 class BoneFractureResNet50(nn.Module):
-    """
-    ResNet50 for Bone Fracture Classification
-    Uses pre-trained weights from ImageNet
-    """
 
     def __init__(self, num_classes=2, pretrained=True):
         super(BoneFractureResNet50, self).__init__()
@@ -68,16 +51,10 @@ class BoneFractureResNet50(nn.Module):
         return self.resnet(x)
 
     def get_conv1_filters(self):
-        """Extract first convolutional layer filters"""
         return self.resnet.conv1.weight.data.clone()
 
 
 class BoneFractureVGG16(nn.Module):
-    """
-    VGG16 for Bone Fracture Classification
-    Uses pre-trained weights from ImageNet
-    """
-
     def __init__(self, num_classes=2, pretrained=True):
         super(BoneFractureVGG16, self).__init__()
 
@@ -99,15 +76,10 @@ class BoneFractureVGG16(nn.Module):
         return self.vgg(x)
 
     def get_conv1_filters(self):
-        """Extract first convolutional layer filters"""
         return self.vgg.features[0].weight.data.clone()
 
 
 class BoneFractureVGG19(nn.Module):
-    """
-    VGG19 for Bone Fracture Classification
-    Uses pre-trained weights from ImageNet
-    """
 
     def __init__(self, num_classes=2, pretrained=True):
         super(BoneFractureVGG19, self).__init__()
@@ -130,5 +102,4 @@ class BoneFractureVGG19(nn.Module):
         return self.vgg(x)
 
     def get_conv1_filters(self):
-        """Extract first convolutional layer filters"""
         return self.vgg.features[0].weight.data.clone()

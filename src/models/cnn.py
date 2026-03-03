@@ -1,19 +1,8 @@
-"""
-Custom CNN model for bone fracture detection.
-
-This module contains the custom-designed 2D Convolutional Neural Network
-for binary classification of bone fracture images.
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 class BoneFractureCNN(nn.Module):
-    """
-    2D Convolutional Neural Network for Bone Fracture Classification
-    Architecture: 4 conv layers with increasing filters [32, 64, 128, 256]
-    """
 
     def __init__(self, num_classes=2, dropout_rate=0.5):
         super(BoneFractureCNN, self).__init__()
@@ -96,5 +85,4 @@ class BoneFractureCNN(nn.Module):
         return x
 
     def get_conv1_filters(self):
-        """Extract first convolutional layer filters for visualization"""
         return self.conv1.weight.data.clone()

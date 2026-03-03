@@ -1,27 +1,7 @@
-"""
-Training utilities for bone fracture detection models.
-
-This module contains functions for training and validating models for one epoch.
-"""
-
 import torch
 
 
 def train_epoch(model, dataloader, criterion, optimizer, device):
-    """
-    Train for one epoch.
-
-    Args:
-        model: PyTorch model
-        dataloader: Training data loader
-        criterion: Loss function
-        optimizer: Optimizer
-        device: Device to train on (cpu/cuda)
-
-    Returns:
-        epoch_loss: Average loss for the epoch
-        epoch_acc: Accuracy for the epoch
-    """
     model.train()
     running_loss = 0.0
     correct = 0
@@ -55,21 +35,6 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
 
 
 def validate_epoch(model, dataloader, criterion, device):
-    """
-    Validate for one epoch.
-
-    Args:
-        model: PyTorch model
-        dataloader: Validation data loader
-        criterion: Loss function
-        device: Device to validate on (cpu/cuda)
-
-    Returns:
-        epoch_loss: Average loss for the epoch
-        epoch_acc: Accuracy for the epoch
-        all_preds: List of all predictions
-        all_labels: List of all labels
-    """
     model.eval()
     running_loss = 0.0
     correct = 0

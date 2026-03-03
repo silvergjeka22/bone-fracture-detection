@@ -6,21 +6,8 @@ from PIL import Image
 from sklearn.metrics import f1_score, classification_report, confusion_matrix
 
 class DatasetPrinter:
-    """
-    A utility class for printing dataset statistics and summaries.
-    Handles analysis and visualization of image datasets split into train/val/test.
-    """
     @staticmethod
     def print_split_summary(base_path, train_path, val_path, test_path):
-        """
-        Prints the number of images based on train/test/val splits.
-
-        Args:
-            base_path: Base directory path
-            train_path: Path to training data
-            val_path: Path to validation data
-            test_path: Path to test data
-        """
         for split_name, split_path in [('TRAIN', train_path), ('VAL', val_path), ('TEST', test_path)]:
             print(f"\n{split_name}:")
             if os.path.exists(split_path):
@@ -34,16 +21,6 @@ class DatasetPrinter:
 
     @staticmethod
     def analyze_split(split_path, split_name):
-        """
-        Analyze one split (train/val/test) and return statistics.
-
-        Args:
-            split_path: Path to the split directory
-            split_name: Name of the split (e.g., 'TRAIN', 'VAL', 'TEST')
-
-        Returns:
-            Dictionary containing statistics about the split
-        """
         stats = {
             'split_name': split_name,
             'classes': {},
@@ -87,12 +64,6 @@ class DatasetPrinter:
 
     @staticmethod
     def print_all_stats(all_stats):
-        """
-        Prints all statistics info based on train/val/test splits.
-
-        Args:
-            all_stats: List of statistics dictionaries from analyze_split
-        """
         for stats in all_stats:
             if stats['total'] > 0:
                 print(f"\n{stats['split_name']}:")
@@ -113,12 +84,6 @@ class DatasetPrinter:
 
     @staticmethod 
     def print_summary_table(all_stats):
-        """
-        Print summary statistics table.
-
-        Args:
-            all_stats: List of statistics dictionaries from analyze_split
-        """
         summary_data = []
         for stats in all_stats:
             if stats['total'] > 0:
@@ -140,48 +105,20 @@ class DatasetPrinter:
 
     @staticmethod
     def count_parameters(model):
-        """
-        Count trainable parameters in a model.
-
-        Args:
-            model: PyTorch model
-
-        Returns:
-            Number of trainable parameters
-        """
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     @staticmethod
     def print_all_info(base_path, all_stats, train_path, val_path, test_path):
-        """
-        Print all information including split summary, stats, and summary table.
-
-        Args:
-            all_stats: List of statistics dictionaries from analyze_split
-            train_path: Path to training data
-            val_path: Path to validation data
-            test_path: Path to test data
-        """
         DatasetPrinter.print_split_summary(base_path, train_path, val_path, test_path)
         DatasetPrinter.print_all_stats(all_stats)
         DatasetPrinter.print_summary_table(all_stats)
 
     @staticmethod
     def print_detailed_metrics(test_labels, test_preds, class_names):
-        """
-        Print detailed classification metrics including F1, classification report, and confusion matrix.
-        
-        Args:
-            test_labels: True labels
-            test_preds: Predicted labels
-            class_names: List of class names
-        """
 
         # F1 Score
         f1 = f1_score(test_labels, test_preds, average='binary')
-        print("\n" + "="*70)
         print("DETAILED CLASSIFICATION METRICS")
-        print("="*70)
         print(f"\nTest F1 Score: {f1:.4f}")
         
         # Classification Report

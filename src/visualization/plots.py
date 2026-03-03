@@ -71,7 +71,6 @@ class PlotVisualizer:
     
     @staticmethod
     def plot_stacked_distribution(all_stats, save_path='stacked_distribution.png'):
-        """Plot stacked bar chart showing class distribution across splits."""
         fig, ax = plt.subplots(figsize=(12, 6))
         
         all_classes = set()
@@ -117,7 +116,6 @@ class PlotVisualizer:
     
     @staticmethod
     def plot_dimensions_analysis(all_stats, save_path='dimensions_analysis.png'):
-        """Plot image dimension histograms for each split."""
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         colors_splits = ['#FF6B6B', '#4ECDC4', '#95E1D3']
         
@@ -153,7 +151,6 @@ class PlotVisualizer:
     
     @staticmethod
     def plot_sample_images(train_path, val_path, test_path, save_path='sample_images.png'):
-        """Display sample images from each split."""
         fig, axes = plt.subplots(3, 6, figsize=(18, 9))
         
         for row_idx, (split_path, split_name) in enumerate([
@@ -192,7 +189,6 @@ class PlotVisualizer:
     
     @staticmethod
     def plot_class_balance(all_stats, save_path='class_balance.png'):
-        """Plot class balance ratios across splits."""
         fig, ax = plt.subplots(figsize=(12, 6))
         colors_splits = ['#FF6B6B', '#4ECDC4', '#95E1D3']
         
@@ -235,7 +231,6 @@ class PlotVisualizer:
     
     @staticmethod
     def generate_all_plots(all_stats, train_path, val_path, test_path):
-        """Generate all dataset visualization plots at once."""
         PlotVisualizer.plot_split_distribution(all_stats)
         PlotVisualizer.plot_class_distribution_per_split(all_stats)
         PlotVisualizer.plot_stacked_distribution(all_stats)
@@ -245,7 +240,6 @@ class PlotVisualizer:
     
     @staticmethod
     def visualize_batch(train_loader, train_dataset, num_images=8, figsize=(15, 7)):
-        """Visualize a batch of images from the training DataLoader."""
         images, labels = next(iter(train_loader))
         
         print(f"\nBatch shape: {images.shape}")
@@ -273,7 +267,6 @@ class PlotVisualizer:
     
     @staticmethod
     def visualize_filters(model, layer_name='conv1', save_path='cnn_filters.png'):
-        """Visualize filters from the first convolutional layer."""
         filters = model.get_conv1_filters().cpu().numpy()
         
         num_filters = filters.shape[0]
@@ -300,7 +293,6 @@ class PlotVisualizer:
     
     @staticmethod
     def plot_kfold_history(fold_histories, save_path='cnn_kfold_training.png'):
-        """Plot training history for all folds."""
         fig, axes = plt.subplots(1, 2, figsize=(16, 5))
         
         # Plot Loss
@@ -338,13 +330,6 @@ class PlotVisualizer:
 
     @staticmethod
     def visualize_model_comparison(all_results, save_path='cnn_models_comparison.png'):
-        """
-        Visualize comparison of multiple models with mean accuracy bars and learning curves.
-        
-        Args:
-            all_results: Dictionary with model results
-            save_path: Path to save the figure
-        """
         
         fig, axes = plt.subplots(1, 2, figsize=(18, 6))
         
@@ -391,16 +376,6 @@ class PlotVisualizer:
     @staticmethod
     def visualize_confusion_matrix(test_labels, test_preds, class_names, 
                                model_name="Model", save_path=None):
-        """
-        Create and visualize confusion matrix with annotations.
-        
-        Args:
-            test_labels: True labels
-            test_preds: Predicted labels
-            class_names: List of class names
-            model_name: Name of the model for the title
-            save_path: Path to save the figure (optional)
-        """
         
         # Calculate confusion matrix
         cm = confusion_matrix(test_labels, test_preds)

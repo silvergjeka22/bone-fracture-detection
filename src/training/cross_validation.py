@@ -1,9 +1,3 @@
-"""
-K-Fold Cross-Validation utilities.
-
-This module contains functions for training models with k-fold cross-validation.
-"""
-
 import torch
 import torch.nn as nn
 import numpy as np
@@ -16,25 +10,6 @@ from .trainer import train_epoch, validate_epoch
 
 def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
                    batch_size=32, learning_rate=0.001, dropout_rate=0.5, device='cpu'):
-    """
-    Train model with k-fold cross-validation.
-
-    Args:
-        model_class: Model class to instantiate (not an instance)
-        train_dataset: Training dataset
-        k_folds: Number of folds for cross-validation
-        num_epochs: Number of epochs per fold
-        batch_size: Batch size
-        learning_rate: Learning rate
-        dropout_rate: Dropout rate for the model (NEW PARAMETER)
-        device: Device to train on (cpu/cuda)
-
-    Returns:
-        fold_results: List of results for each fold
-        fold_histories: List of training histories for each fold
-        mean_acc: Mean validation accuracy across folds
-        std_acc: Standard deviation of validation accuracy
-    """
 
     # Prepare for k-fold
     kfold = KFold(n_splits=k_folds, shuffle=True, random_state=42)
@@ -139,12 +114,9 @@ def train_kfold_cv(model_class, train_dataset, k_folds=5, num_epochs=30,
     mean_acc = np.mean([r['best_val_acc'] for r in fold_results])
     std_acc = np.std([r['best_val_acc'] for r in fold_results])
 
-    print("="*70)
     print("K-FOLD CROSS-VALIDATION RESULTS")
-    print("="*70)
     for result in fold_results:
         print(f"Fold {result['fold']}: Val Accuracy = {result['best_val_acc']:.4f}")
     print(f"\nMean Val Accuracy: {mean_acc:.4f} ± {std_acc:.4f}")
-    print("="*70)
 
     return fold_results, fold_histories, mean_acc, std_acc
