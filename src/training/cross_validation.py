@@ -11,7 +11,7 @@ from .trainer import train_epoch, validate_epoch
 
 def train_kfold_cv(model_class, train_dataset, model_kwargs=None, k_folds=5,
                    num_epochs=30, batch_size=32, learning_rate=0.001, device='cpu',
-                   dropout_rate=0.5):
+                   dropout_rate=0.5, model_name=None):
     """
     K-Fold Cross-Validation.
 
@@ -115,5 +115,8 @@ def train_kfold_cv(model_class, train_dataset, model_kwargs=None, k_folds=5,
         print(f"  Fold {r['fold']}: acc={r['best_val_acc']:.4f}  f1={r['best_val_f1']:.4f}")
     print(f"\n  Mean Accuracy : {mean_acc:.4f} ± {std_acc:.4f}")
     print(f"  Mean F1 Score : {mean_f1:.4f} ± {std_f1:.4f}")
+
+    if model_name:
+        torch.save(model.state_dict(), f'{model_name}_best_fold_model.pth')
 
     return fold_results, fold_histories, mean_acc, std_acc, mean_f1, std_f1

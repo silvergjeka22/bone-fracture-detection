@@ -4,7 +4,7 @@ from torchvision import models
 
 
 class BoneFractureResNet18(nn.Module):
-    def __init__(self, num_classes=2, pretrained=True):
+    def __init__(self, num_classes=2, pretrained=True, dropout_rate=0.5):
         super(BoneFractureResNet18, self).__init__()
 
         # Load pre-trained ResNet18
@@ -17,7 +17,7 @@ class BoneFractureResNet18(nn.Module):
         self.resnet.fc = nn.Sequential(
             nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(dropout_rate),
             nn.Linear(512, num_classes)
         )
 
@@ -30,7 +30,7 @@ class BoneFractureResNet18(nn.Module):
 
 class BoneFractureResNet50(nn.Module):
 
-    def __init__(self, num_classes=2, pretrained=True):
+    def __init__(self, num_classes=2, pretrained=True, dropout_rate=0.5):
         super(BoneFractureResNet50, self).__init__()
 
         # Load pre-trained ResNet50
@@ -43,7 +43,7 @@ class BoneFractureResNet50(nn.Module):
         self.resnet.fc = nn.Sequential(
             nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(dropout_rate),
             nn.Linear(512, num_classes)
         )
 
@@ -55,7 +55,7 @@ class BoneFractureResNet50(nn.Module):
 
 
 class BoneFractureVGG16(nn.Module):
-    def __init__(self, num_classes=2, pretrained=True):
+    def __init__(self, num_classes=2, pretrained=True, dropout_rate=0.5):
         super(BoneFractureVGG16, self).__init__()
 
         # Load pre-trained VGG16
@@ -68,7 +68,7 @@ class BoneFractureVGG16(nn.Module):
         self.vgg.classifier[6] = nn.Sequential(
             nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(dropout_rate),
             nn.Linear(512, num_classes)
         )
 
@@ -81,7 +81,7 @@ class BoneFractureVGG16(nn.Module):
 
 class BoneFractureVGG19(nn.Module):
 
-    def __init__(self, num_classes=2, pretrained=True):
+    def __init__(self, num_classes=2, pretrained=True, dropout_rate=0.5):
         super(BoneFractureVGG19, self).__init__()
 
         # Load pre-trained VGG19
@@ -94,7 +94,7 @@ class BoneFractureVGG19(nn.Module):
         self.vgg.classifier[6] = nn.Sequential(
             nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(dropout_rate),
             nn.Linear(512, num_classes)
         )
 
