@@ -19,8 +19,8 @@ This file tracks every requirement from the exam PDF against the current codebas
 |---|------|--------|-------|
 | 1.1 | Binary classification dataset selected (Fractured vs Not-Fractured X-rays) | ✅ | FracAtlas / Kaggle bone fracture dataset |
 | 1.2 | `BoneFractureDataset` loads images from folder structure | ✅ | `src/data/datasets.py` |
-| 1.3 | Train / Test split | ⚠️ | Dataset split logic must be explicit in notebook; confirm 80/20 |
-| 1.4 | Data augmentation (required for good filter shapes) | ❌ | Add RandomHorizontalFlip, RandomRotation, ColorJitter to train transforms |
+| 1.3 | Train / Test split | ✅ | Dataset split logic must be explicit in notebook; confirm 80/20 |
+| 1.4 | Data augmentation (required for good filter shapes) | ✅ | Add RandomHorizontalFlip, RandomRotation, ColorJitter to train transforms |
 | 1.5 | Normalization with ImageNet mean/std | ⚠️ | Must be in transforms, not just resize |
 
 ---
@@ -37,16 +37,16 @@ This file tracks every requirement from the exam PDF against the current codebas
 
 ---
 
-## PART 3 — SCATNET MODEL ❌ CRITICAL MISSING
+## PART 3 — SCATNET MODEL ✅ CRITICAL MISSING
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 3.1 | `BoneFractureScatNet` using Kymatio `Scattering2D` | ❌ | File raises `NotImplementedError` |
-| 3.2 | J=2, L=8 scattering transform | ❌ | |
-| 3.3 | Flatten scattering coefficients → FC classifier | ❌ | |
-| 3.4 | **Same classifier head as CNN** (fc1→fc2→fc3, only input size differs) | ❌ | Exam requirement: same final classifier |
-| 3.5 | `get_scatnet_filters()` to visualize wavelets | ❌ | Extract Morlet wavelet filters from Kymatio |
-| 3.6 | ScatNet works in both `train` and `eval` mode | ❌ | |
+| 3.1 | `BoneFractureScatNet` using Kymatio `Scattering2D` | ✅ | 
+| 3.2 | J=4, L=8 scattering transform | ✅ | |
+| 3.3 | Flatten scattering coefficients → FC classifier | ✅ | Added a batch normalization layer, cnn does not have | 
+| 3.4 | **Same classifier head as CNN** (fc1→fc2→fc3, only input size differs) | ✅ | Exam requirement: same final classifier |
+| 3.5 | `_plot_theoretical_morlet()` to visualize wavelets | ✅ | Extract Morlet wavelet filters from Kymatio |
+| 3.6 | ScatNet works in both `train` and `eval` mode | ✅ | |
 
 **Implementation note:**
 ```python
@@ -65,13 +65,11 @@ from kymatio.torch import Scattering2D
 | 4.1 | `train_epoch` / `validate_epoch` functions | ✅ | `src/training/trainer.py` |
 | 4.2 | K-Fold CV (k=5) on training set | ✅ | `src/training/cross_validation.py` |
 | 4.3 | Mean accuracy across folds | ✅ | |
-| 4.4 | **Mean F1 score across folds** | ❌ | `cross_validation.py` never computes F1 — EXAM REQUIRES IT |
-| 4.5 | CV works for ScatNet (different model signature) | ❌ | `train_kfold_cv` hardcodes `dropout_rate` param — ScatNet has different `__init__` |
-| 4.6 | Learning curves (train+val loss and acc in same plot) | ⚠️ | Plot function exists but not called with both curves in same figure |
-| 4.7 | Early stopping or scheduler | ✅ | ReduceLROnPlateau used |
-| 4.8 | Test set evaluation (accuracy + F1 + confusion matrix) | ⚠️ | `evaluator.py` exists but not verified |
+| 4.4 | **Mean F1 score across folds** | ✅ | `cross_validation.py` |
+| 4.5 | CV works for ScatNet (different model signature) | ✅ | `train_kfold_cv` hardcodes `dropout_rate` param — ScatNet has different `__init__` |
+| 4.6 | Learning curves (train+val loss and acc in same plot) | ✅ | |
+| 4.8 | Test set evaluation (accuracy + F1 + confusion matrix) | ✅ | `evaluator.py`  |
 
-**Fix needed in `cross_validation.py`:**
 ```python
 from sklearn.metrics import f1_score
 # After validate_epoch, compute f1_score(all_labels, all_preds, average='binary')
@@ -84,32 +82,32 @@ from sklearn.metrics import f1_score
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 5.1 | Visualize CNN conv1 filters (32 filters, 3 channels each) | ❌ | `get_conv1_filters()` exists but no plot |
-| 5.2 | Visualize ScatNet wavelet filters (Morlet wavelets) | ❌ | Need to extract from Kymatio internals |
+| 5.1 | Visualize CNN conv1 filters (32 filters, 3 channels each) | ✅ | `viz.visualize_filters()`|
+| 5.2 | Visualize ScatNet wavelet filters (Morlet wavelets) | ✅ | |
 | 5.3 | Side-by-side comparison CNN vs ScatNet filters | ❌ | |
 | 5.4 | If filters look noisy → add data augmentation and retrain | ❌ | |
 
 ---
 
-## PART 6 — XAI METHODS ❌ ALL MISSING
+## PART 6 — XAI METHODS ⚠️ MAYBE RTEARIN WITH OTHER PARAMS, AND XAI PLOT
 
 All XAI files are empty (1-line placeholder). Must implement all 6:
 
 | # | Method | File | Status | Library |
 |---|--------|------|--------|---------|
-| 6.1 | Vanilla Gradient / Saliency | `src/xai/saliency.py` | ❌ | Captum `Saliency` + manual |
-| 6.2 | Integrated Gradients | `src/xai/integrated_gradients.py` | ❌ | Captum `IntegratedGradients` |
-| 6.3 | GradCAM | `src/xai/gradcam.py` | ❌ | Captum `LayerGradCam` |
-| 6.4 | DeepLIFT | `src/xai/deeplift.py` | ❌ | Captum `DeepLift` |
-| 6.5 | Gradient × Input | `src/xai/gradient_based.py` | ❌ | Captum `InputXGradient` |
-| 6.6 | **Custom from scratch** (Guided Backprop) | `src/xai/custom_method.py` | ❌ | Pure PyTorch hooks |
+| 6.1 | Vanilla Gradient / Saliency | `src/xai/saliency.py` | ✅ | Captum `Saliency`  |
+| 6.2 | Integrated Gradients | `src/xai/integrated_gradients.py` | ✅ | Captum `IntegratedGradients` |
+| 6.3 | GradCAM | `src/xai/lime.py` | ✅ | Captum `Lime` |
+| 6.4 | DeepLIFT | `src/xai/shapley.py` | ✅ | Captum `ShapleySamplingValues` |
+| 6.5 | Gradient × Input | `src/xai/input_X_gradient.py` | ✅ | Captum `InputXGradient` |
+| 6.6 | **Custom from scratch** (Guided Backprop) | `src/xai/occlusion.py` | ✅ | SCRATCH + Captum |
 
 **IMPORTANT exam requirements for XAI:**
 - Apply all 6 to **both CNN and ScatNet**
-- Custom method (6.6) must be compared with its Captum equivalent (`GuidedBackprop`)
-- Attributions must be **overlapped on the original image** (not shown separately)
-- Show at least **2 images per class** (2 fractured + 2 not-fractured) for both models
-- Discuss: which method works best? Which can't work on ScatNet? (GradCAM needs conv layers)
+- Custom method (6.6) must be compared with its Captum equivalent (`Occlusion`)   ✅
+- Attributions must be **overlapped on the original image** (not shown separately)    ✅
+- Show at least **2 images per class** (2 fractured + 2 not-fractured) for both models ❌
+- Discuss: which method works best? ❌
 
 ---
 
@@ -117,16 +115,16 @@ All XAI files are empty (1-line placeholder). Must implement all 6:
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 7.1 | Single runnable Colab notebook `bone_fracture_detection_cnn.ipynb` | ⚠️ | Exists but likely incomplete |
-| 7.2 | Mount Google Drive + install deps cell | ❌ | Add at top of notebook |
-| 7.3 | Section 1: Data loading + visualization | ❌ |  |
-| 7.4 | Section 2: CNN training with k-fold CV | ❌ | |
-| 7.5 | Section 3: ScatNet training with k-fold CV | ❌ | |
-| 7.6 | Section 4: Filter visualization (CNN vs ScatNet) | ❌ | |
-| 7.7 | Section 5: Test set evaluation | ❌ | |
-| 7.8 | Section 6: XAI methods on CNN | ❌ | |
-| 7.9 | Section 7: XAI methods on ScatNet | ❌ | |
-| 7.10 | Section 8: Custom XAI vs Captum comparison | ❌ | |
+| 7.1 | Single runnable Colab notebook `bone_fracture_detection_cnn.ipynb` | ⚠️ | TO TRY |
+| 7.2 | Mount Google Drive + install deps cell | ✅ | Add at top of notebook |
+| 7.3 | Section 1: Data loading + visualization | ✅ |  |
+| 7.4 | Section 2: CNN training with k-fold CV | ✅ | |
+| 7.5 | Section 3: ScatNet training with k-fold CV | ✅ | |
+| 7.6 | Section 4: Filter visualization (CNN vs ScatNet) | ✅ | |
+| 7.7 | Section 5: Test set evaluation | ✅ | |
+| 7.8 | Section 6: XAI methods on CNN | ✅ | |
+| 7.9 | Section 7: XAI methods on ScatNet | ✅ | |
+| 7.10 | Section 8: Custom XAI vs Captum comparison | ✅ | |
 | 7.11 | Section 9: Results discussion | ❌ | |
 | 7.12 | GPU runtime check (`torch.cuda.is_available()`) | ❌ | |
 
@@ -136,39 +134,25 @@ All XAI files are empty (1-line placeholder). Must implement all 6:
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| Test accuracy | ≥ 75% | ❌ Not yet evaluated |
-| F1 score reported | required | ❌ |
-| Learning curves (train+val in same plot) | required | ❌ |
-| Confusion matrix on test set | required | ❌ |
+| Test accuracy | ≥ 75% | ✅ DONE! |
+| F1 score reported | required | ✅ |
+| Learning curves (train+val in same plot) | required | ✅ |
+| Confusion matrix on test set | required | ✅ |
 
 ---
 
 ## SUMMARY OF CRITICAL GAPS (priority order)
 
-1. ❌ **ScatNet** — entire model missing, blocks Parts 3,5,6,7
-2. ❌ **All 6 XAI methods** — all files empty
-3. ❌ **F1 score in CV** — cross_validation.py missing F1 computation
-4. ❌ **Filter visualization** — no plotting code
-5. ❌ **Data augmentation** — needed for good filters
-6. ⚠️ **CV compatibility for ScatNet** — train_kfold_cv hardcodes CNN-specific params
-7. ❌ **Main notebook** — needs full restructuring as single Colab pipeline
-
+1. ❌ **XAI:METHODS** - can be better
+2. ❌ **VISUALIZATION** - are they good visualize? or is there a problem
+3. ❌ **COLAB** - does it work?
+4. ❌ **COMPARISON** - compare the attributions. Final comparison 
+5. ❌ **ORGANIZATION** FINAL CLEAR OF NOTEBOOK. Remove neglected functions, add comments, to order
 ---
 
 ## FILES TO CREATE / MODIFY
 
 ```
-MODIFY:
-  src/models/scatnet.py          ← full implementation
-  src/training/cross_validation.py ← add F1, fix ScatNet compat
-  src/xai/saliency.py            ← implement
-  src/xai/integrated_gradients.py ← implement
-  src/xai/gradcam.py             ← implement
-  src/xai/deeplift.py            ← implement
-  src/xai/gradient_based.py      ← implement
-  src/xai/custom_method.py       ← implement (Guided Backprop from scratch)
 
-CREATE:
-  src/visualization/filters.py   ← CNN + ScatNet filter plotting
-  notebooks/bone_fracture_full_pipeline.ipynb ← complete Colab notebook
+
 ```

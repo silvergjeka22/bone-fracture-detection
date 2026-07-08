@@ -32,3 +32,30 @@ def compute_saliency_manual(model, image_tensor, target_class):
     if attr.dim() == 3:
         attr = attr.mean(dim=0)
     return attr.cpu().numpy()
+
+
+def compute_saliency_map(model, image_tensor, target_class=None, device='cuda'):
+
+    model.eval()
+
+    input_image = image_tensor.unsqueeze(0).to(device)
+    input_image.requires_grad_(True)
+
+    if target_class is None:
+        with torch.no_grad():
+            pred = model(input_image)
+            target_class = pred.argmax(dim=1).item()
+
+    saliency = Saliency(model)
+
+    attribution = saliency.attribute(
+        input_image,
+        target=target_class,
+        abs=False
+    )
+    
+    attribution = attribution.squeeze().detach().cpu()
+
+    if attribution.dim() == 3: attribution = attribution.mean(0)
+
+    return attribution.numpy()

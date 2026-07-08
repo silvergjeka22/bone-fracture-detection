@@ -12,6 +12,7 @@ Provides:
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from scipy.ndimage import gaussian_filter
 
 
 # ---------------------------------------------------------------------------
@@ -273,3 +274,34 @@ def plot_all_xai_methods(image_tensor, attributions_dict, model_name='CNN',
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.show()
+
+
+def visualize_triplet(method_network, title, inputs, attribution_all):
+    fig, axes = plt.subplots(8, 3, figsize=(12, 24))
+
+    for i in range(8):
+        img = inputs[i].mean(0).cpu().numpy()
+        sal = np.abs(attribution_all.get(method_network)[i])
+        sal = gaussian_filter(sal, sigma=1.5)
+        
+        # Normalizza 0-1
+        sal = (sal - sal.min()) / (sal.max() - sal.min())
+        
+        # Colonna 1: immagine originale
+        axes[i, 0].imshow(img, cmap='gray')
+        # if i == 0: axes[i, 0].set_title('Original', fontsize=15)
+        axes[i, 0].axis('off')
+        
+        # Colonna 2: solo saliency
+        axes[i, 1].imshow(sal, cmap='hot')
+        if i == 0: axes[i, 1].set_title(title, fontsize=15)
+        axes[i, 1].axis('off')
+        
+        # Colonna 3: overlay
+        axes[i, 2].imshow(img, cmap='gray')
+        axes[i, 2].imshow(sal, cmap='hot', alpha=0.5,
+                        vmin=np.percentile(sal, 80), vmax=sal.max())
+        # axes[i, 2].set_title(f'Overlay - {labels[i]}', fontsize=8)
+        axes[i, 2].axis('off')
+
+    plt.tight_layout()
