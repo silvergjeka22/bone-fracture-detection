@@ -100,22 +100,25 @@ class BoneFractureScatNet(nn.Module):
         logits = self.classifier(s)
         return logits
 
+import kymatio
 
 class ScatNet2D(nn.Module):
     def __init__(
         self,
         num_classes=2,
         image_size=(224, 224),
-        in_channels=3,
         J=4,
         L=8,
         hidden_dim=512,
         dropout_rate=0.5,):
         super(ScatNet2D, self).__init__()
         self.scattering = kymatio.torch.Scattering2D(J=J, L=L, shape= image_size, backend='torch')
+
+        for p in self.scattering.parameters():
+            p.requires_grad = False
         
         self.classifier = nn.Sequential(
-            nn.Linear(417074, hidden_dim),
+            nn.Linear(245196, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout_rate),
@@ -132,5 +135,4 @@ class ScatNet2D(nn.Module):
         x = self.scattering(x)      # scattering transform
         x = x.view(x.size(0), -1)
         x = self.classifier(x)      # classifier
-        x = torch.softmax(x, dim=1) # get probabilities for each class
         return x
