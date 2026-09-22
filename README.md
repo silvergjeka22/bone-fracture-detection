@@ -33,12 +33,27 @@ Why this layout:
 - **One home for every function.** Before, the same plotting code existed in the notebook and in
   `src/`, there were three saliency functions and several unused modules. Now each step of the
   pipeline is one flat module, imported as `from src import data, models, training, xai, plots`.
-- **The notebook reads like the report.** One settings cell, then one section per exam step with
-  short cells (1 to 9 lines) that call `src`. It went from 190 cells / 51 MB to 27 cells.
+- **The notebook reads like the report.** One settings cell, then one section per step with
+  short cells that call `src`. It went from 190 cells / 51 MB to 35 cells.
 - **Expensive steps are optional.** `TRAIN = False` reloads saved weights and CV logs; XAI maps are
   cached, so re-running the notebook for figures takes minutes, not hours.
 - **Nothing was deleted.** Old material is in `archive/` (and in git history); delete that folder
   whenever you no longer need it.
+
+## Notebook flow
+
+First compare the models, then explain the best one:
+
+1. **Data**: counts per split, sample images
+2. **Models**: architectures and parameters
+3. **5-fold cross-validation** on the training set (or reload it with `TRAIN = False`)
+4. **Test set**: metrics and confusion matrices
+5. **Model comparison**: scores side by side, where each model fails, learned vs fixed filters.
+   The **best model** is chosen by its CV score (`SELECT_BY`), never by the test set.
+6. **XAI on the best model**: six Captum methods on all 8 images, plus how much the methods agree
+7. **Our Occlusion vs Captum's**
+8. **The same XAI on CNN and ScatNet** (exam requirement: both models, 2 images per class)
+9. **Discussion**
 
 ## How to run
 

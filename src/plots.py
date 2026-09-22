@@ -59,6 +59,27 @@ def plot_cv_history(cv, save_to=None):
     _finish(fig, save_to)
 
 
+def plot_model_comparison(cv, test, best=None, save_to=None):
+    """CV and test scores of every model on one percentage axis, one row per model."""
+    names = list(test)
+    scores = {
+        "CV accuracy": [cv[n]["mean_acc"] for n in names],
+        "test accuracy": [test[n]["accuracy"] for n in names],
+        "test F1 (fractured)": [test[n]["f1"] for n in names],
+        "test recall (fractured)": [test[n]["recall"] for n in names],
+    }
+    fig, ax = plt.subplots(figsize=(8.5, 0.8 * len(names) + 1.6))
+    for (label, values), marker in zip(scores.items(), "osD^"):
+        ax.scatter([100 * v for v in values], range(len(names)), marker=marker, s=70, label=label, zorder=3)
+    ax.set_yticks(range(len(names)), [f"{n}  (best)" if n == best else n for n in names])
+    ax.invert_yaxis()
+    ax.set_xlabel("score (%)")
+    ax.grid(axis="x", alpha=0.3)
+    ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=9)
+    ax.set_title("Model comparison: cross-validation (training set) and test set")
+    _finish(fig, save_to)
+
+
 def plot_confusion_matrices(test, class_names, save_to=None):
     """One confusion matrix per model (rows = true class, columns = predicted class)."""
     fig, axes = plt.subplots(1, len(test), figsize=(4 * len(test), 3.8), squeeze=False)

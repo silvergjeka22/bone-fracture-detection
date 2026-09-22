@@ -48,8 +48,13 @@ scratch" requirement).
    slow computations (e.g. attributions) take a `cache=` path.
 5. **Last expression displays**: functions return DataFrames for tables and plot functions
    draw and show their figure, so cells stay one-liners.
-6. **End with a discussion section** in markdown (results table, interpretation, limitations).
-7. **Commit the notebook without huge outputs**. Figures belong in `results/figures/`.
+6. **Compare first, then go deep.** When several models are trained, compare them before
+   analysing any of them (CV + test table, where each fails), choose the best with its
+   cross-validation score (never the test set, which must stay an unbiased estimate), and spend
+   the expensive analysis (XAI, error inspection) on that model, plus any model the assignment
+   explicitly requires.
+7. **End with a discussion section** in markdown (results table, interpretation, limitations).
+8. **Commit the notebook without huge outputs**. Figures belong in `results/figures/`.
 
 ## Workflow A: restructure an existing project
 
