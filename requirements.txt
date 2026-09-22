@@ -1,0 +1,10 @@
+torch>=2.0
+torchvision>=0.15
+kymatio>=0.3
+captum>=0.7
+scikit-learn
+scipy
+numpy
+pandas
+matplotlib
+pillow
