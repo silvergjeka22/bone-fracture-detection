@@ -24,13 +24,15 @@ Bugs found by reading the outputs (not by running anything):
 
 ```
 src/  __init__.py data.py models.py training.py xai.py occlusion_scratch.py plots.py utils.py
-notebooks/main.ipynb        27 cells, 17 short code cells, 15 KB
+notebooks/main.ipynb        35 cells, 22 short code cells
 results/cv/*.json           CV logs parsed from the old notebook outputs
 archive/                    old notebooks (key redacted), old src/, old attribution files
 ```
 
 Notebook sections: Setup, Settings, 1 Data, 2 Models, 3 Cross-validation, 4 Test,
-5 Filters, 6 XAI, 7 Scratch vs library, 8 Method agreement, 9 Discussion.
+5 Model comparison (scores, errors, filters, best model chosen by CV), 6 XAI on the best model,
+7 Scratch vs library, 8 XAI on the models the exam requires (CNN, ScatNet), 9 Discussion.
+The user asked explicitly for "compare first, then explain the best model".
 
 Typical cells:
 

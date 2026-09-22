@@ -182,13 +182,46 @@ def cv_table(cv):
 
 
 def results_table(cv, test):
-    """Cross-validation and test metrics side by side."""
+    """Cross-validation and test metrics side by side, best CV accuracy first."""
     return pd.DataFrame({
         name: {"CV accuracy": cv[name]["mean_acc"], "CV F1": cv[name]["mean_f1"],
                "test accuracy": test[name]["accuracy"], "test F1": test[name]["f1"],
                "test precision": test[name]["precision"], "test recall": test[name]["recall"]}
         for name in test
-    }).T.round(4)
+    }).T.round(4).sort_values("CV accuracy", ascending=False)
+
+
+def select_best(cv, metric="mean_acc"):
+    """Name of the model with the highest cross-validation score ('mean_acc' or 'mean_f1').
+
+    The choice uses only the cross-validation on the training set: choosing on the test set
+    would turn the test accuracy of the chosen model into an optimistic estimate.
+    """
+    best = max(cv, key=lambda name: cv[name][metric])
+    print(f"best model: {best} (CV {metric} = {cv[best][metric]:.4f})")
+    return best
+
+
+def error_table(test, class_names):
+    """Where each model goes wrong on the test set.
+
+    'missed' = fractures predicted as not fractured (the costly error), 'false alarms' = the
+    opposite, 'only this model' = test images that every other model classifies correctly.
+    """
+    wrong = {name: {i for i, (t, p) in enumerate(zip(r["y_true"], r["y_pred"])) if t != p}
+             for name, r in test.items()}
+    rows = {}
+    for name, r in test.items():
+        y_true, y_pred = np.array(r["y_true"]), np.array(r["y_pred"])
+        others = set().union(*(wrong[m] for m in wrong if m != name))
+        rows[name] = {
+            f"missed {class_names[POSITIVE_CLASS]}": int(((y_true == POSITIVE_CLASS) & (y_pred != POSITIVE_CLASS)).sum()),
+            "false alarms": int(((y_true != POSITIVE_CLASS) & (y_pred == POSITIVE_CLASS)).sum()),
+            "total errors": len(wrong[name]),
+            "only this model": len(wrong[name] - others),
+        }
+    print(f"{len(set.intersection(*wrong.values()))} test images are misclassified by every model")
+    return pd.DataFrame(rows).T
 
 
 def prediction_table(labels, preds, class_names):
