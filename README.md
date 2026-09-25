@@ -1,120 +1,153 @@
-# Bone Fracture Detection: CNN vs ScatNet + Explainable AI
+# Bone Fracture Detection: CNN vs ScatNet, explained with XAI
 
 MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
-Binary classification of bone X-rays (**fractured** / **not fractured**) with a custom CNN, a
-wavelet Scattering Network (ScatNet) and a pretrained ResNet18 baseline, explained with six XAI
-methods; Occlusion is also implemented from scratch and compared with Captum.
+Binary classification of X-rays (**fractured** / **not fractured**). A CNN trained from scratch and a
+wavelet Scattering Network (ScatNet, Kymatio) are compared, with an ImageNet-pretrained ResNet18 as a
+reference; all three end with **the same classifier**. The best model is chosen by cross-validation,
+tested once, its filters are compared with ScatNet's wavelets, and the models are explained with
+**six XAI methods** (Captum), one of which (Occlusion) is also implemented from scratch.
 
-## Structure
+Everything runs from one notebook, `notebooks/main.ipynb`, on a **Kaggle GPU** (`./run.sh push`).
+
+## Exam requirements -> where
+
+| requirement (exam PDF) | where |
+|---|---|
+| binary dataset, train/test split | Kaggle *Bone Fracture Multi-Region X-ray Data*; notebook §1, `src/data.py` |
+| CNN + ScatNet, same classifier except input size | `src/models.py` (`Classifier`), notebook §2 (asserted) |
+| k-fold CV: mean accuracy + mean F1 on the training set | `training.cross_validate`, notebook §3 |
+| filters extracted and compared | notebook §6: `filters_cnn`, `filters_scatnet`, `frequency_coverage` |
+| test set, >= 75% accuracy | notebook §4, `training.evaluate_test` |
+| six XAI methods on CNN and ScatNet | `src/xai.py`: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM, Occlusion, LIME |
+| one method from scratch vs Captum | `src/occlusion_scratch.py`, notebook §8 |
+| attributions overlaid, 2 images per class, both models | notebook §7 (`xai_cnn`, `xai_scatnet`) |
+| quality of the attributions, methods that cannot be used | notebook §9 (deletion test, agreement), §11 |
+| learning curves train + val in one figure | `learning_curves.png` |
+| presentation | `presentation/main.pdf` (built from `results/`), `presentation/SPEAKER_NOTES.md` |
+
+`python .claude/skills/exam-checklist/scripts/check_exam.py` checks all of this on a finished run.
+
+## Results
+
+The numbers are produced by the Kaggle run and written to `results/summary.json`
+(`report.key_findings` prints them at the end of the notebook). They are not typed anywhere by hand:
+the slides read `results/latex/`. After `./run.sh get`, the full table is in `results/latex/test.tex`
+and in the notebook's §4-§5.
+
+## Project layout
 
 ```
 bone-fracture-detection/
-├── notebooks/main.ipynb       the whole experiment: settings + calls to src, no function definitions
+├── notebooks/main.ipynb      the whole experiment: settings + calls to src (no function definitions)
 ├── src/
-│   ├── data.py                dataset, transforms, loaders, dataset summary
-│   ├── models.py              BoneFractureCNN, ScatNet2D, BoneFractureResNet18, build_model()
-│   ├── training.py            5-fold CV, test metrics, save/load weights and results
-│   ├── xai.py                 the six Captum methods, caching, scratch-vs-Captum, method agreement
-│   ├── occlusion_scratch.py   Occlusion implemented from scratch (the "custom" method)
-│   ├── plots.py               every figure of the notebook
-│   └── utils.py               seed, device, parameter count
-├── results/
-│   ├── cv/<model>.json        CV metrics + learning curves (current files: imported from the last full run)
-│   ├── models/<model>.pth     trained weights (not in git: copy them here, see below)
-│   ├── attributions/          cached XAI maps (.npz), created by the notebook
-│   └── figures/               figures for the report, created by the notebook
-├── archive/                   everything from before the refactor (old notebooks, old src, old attribution files)
-├── .claude/skills/ml-project-structure/   Claude Code skill that builds/keeps this structure
-└── requirements.txt
+│   ├── bootstrap.py          Kaggle / Colab / local setup: packages, dataset path, output folders
+│   ├── data.py               load + cache X-rays, dataset study (sizes, balance, near-duplicates), loaders
+│   ├── models.py             BoneFractureCNN, ScatNet, ResNet18, one shared Classifier
+│   ├── training.py           grouped k-fold CV, final training, test metrics, bootstrap CI, McNemar
+│   ├── xai.py                six XAI methods, applicability, deletion test, agreement, scratch vs Captum
+│   ├── occlusion_scratch.py  Occlusion implemented from scratch
+│   ├── plots.py              every figure (fixed colours per model / class / method)
+│   ├── report.py             summary.json + LaTeX macros/tables for the slides
+│   └── utils.py              seed, device, parameter count, Kymatio/SciPy fix
+├── tests/                    pytest: unit tests + the notebook run end to end on synthetic X-rays
+├── presentation/             beamer slides (main.tex -> main.pdf), speaker notes
+├── results/                  written by the notebook: summary.json, cv/, final/, figures/, latex/
+│                             (models/ and attributions/ are large and gitignored)
+├── docs/previous_run/        CV logs of the first iteration (before the fixes listed below)
+├── kernel-metadata.json      Kaggle kernel: GPU, internet, dataset attached
+├── run.sh                    push / status / get / slides / stop
+└── .claude/skills/           kaggle-run, exam-checklist, presentation, ml-project-structure
 ```
 
-Why this layout:
-- **One home for every function.** Before, the same plotting code existed in the notebook and in
-  `src/`, there were three saliency functions and several unused modules. Now each step of the
-  pipeline is one flat module, imported as `from src import data, models, training, xai, plots`.
-- **The notebook reads like the report.** One settings cell, then one section per step with
-  short cells that call `src`. It went from 190 cells / 51 MB to 35 cells.
-- **Expensive steps are optional.** `TRAIN = False` reloads saved weights and CV logs; XAI maps are
-  cached, so re-running the notebook for figures takes minutes, not hours.
-- **Nothing was deleted.** Old material is in `archive/` (and in git history); delete that folder
-  whenever you no longer need it.
+## Run it on Kaggle (recommended)
 
-## Notebook flow
+Same pattern as `macura-drone`: the job runs on a Kaggle GPU, launched from your terminal; you can
+switch the PC off and download the results later.
 
-First compare the models, then explain the best one:
+**One-time setup**
+1. `pip install kaggle`; on kaggle.com: Settings -> *Create New Token*, save it as `~/.kaggle/kaggle.json`
+   (`chmod 600`; Windows: `C:\Users\<you>\.kaggle\kaggle.json`).
+2. On kaggle.com add a **Secret** `GITHUB_TOKEN`: a GitHub token that can read this private repo
+   (the kernel clones the code with it).
+3. Put your Kaggle username in `kernel-metadata.json` (`"id": "<username>/bone-fracture-detection"`).
 
-1. **Data**: counts per split, sample images
-2. **Models**: architectures and parameters
-3. **5-fold cross-validation** on the training set (or reload it with `TRAIN = False`)
-4. **Test set**: metrics and confusion matrices
-5. **Model comparison**: scores side by side, where each model fails, learned vs fixed filters.
-   The **best model** is chosen by its CV score (`SELECT_BY`), never by the test set.
-6. **XAI on the best model**: six Captum methods on all 8 images, plus how much the methods agree
-7. **Our Occlusion vs Captum's**
-8. **The same XAI on CNN and ScatNet** (exam requirement: both models, 2 images per class)
-9. **Discussion**
+`kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` and `enable_internet` true (clone +
+pip install kymatio/captum + ResNet18 weights), `dataset_sources` =
+`bmadushanirodrigo/fracture-multi-region-x-ray-data` (mounted read-only under `/kaggle/input`).
 
-## How to run
+**Run**
+```bash
+./run.sh push --quick     # 5-minute health check on a small subset (do it once)
+./run.sh status           # queued / running / complete / error
+./run.sh push             # the full run, ~3-4 h on a P100/T4 (5-fold CV x 3 models + final training + XAI)
+./run.sh get              # download into ./out and copy the results into ./results
+./run.sh slides           # rebuild presentation/main.pdf with the new numbers
+```
+The kernel clones branch `main`; for another branch: `BRANCH=<branch> ./run.sh push`.
+Outputs (in `/kaggle/working/results` on the kernel): `summary.json`, `cv/`, `final/`, `figures/`,
+`latex/`, `models/*.pth`, `attributions/*.npz`.
+
+## Run it locally
 
 ```bash
 pip install -r requirements.txt
+# dataset: download the Kaggle dataset and unzip it into data/ (any depth: the train/ val/ test/ folder is found)
+jupyter notebook notebooks/main.ipynb
 ```
+Only the **Settings** cell needs editing (`QUICK`, `TRAIN`, `MODELS`, `EPOCHS`, ...). With `TRAIN = False`
+the notebook reloads `results/models/*.pth` and the JSON logs of a previous run and only redraws.
+Environment variables `BFD_DATA_DIR` / `BFD_RESULTS_DIR` override the paths without editing the notebook.
 
-1. Download the Kaggle dataset *Bone Fracture Multi-Region X-ray Data* into
-   `Bone_Fracture_Binary_Classification/Bone_Fracture_Binary_Classification/` (with `train/`,
-   `val/`, `test/`), plus the `choosen_test/` folder with the 8 images used for XAI.
-2. Open `notebooks/main.ipynb` and edit only the **Settings** cell.
-3. `TRAIN = True` runs the 5-fold CV for every model and saves `results/models/<model>.pth`.
-   `TRAIN = False` needs those files. Weights trained before the refactor load unchanged, just rename them:
-   `custom_cnn_best_fold_model.pth → cnn.pth`, `resnet18_best_fold_model.pth → resnet18.pth`,
-   `scatnet2D_best_fold_model.pth → scatnet.pth`.
+## Tests
 
-On **Colab**: copy the repository to `MyDrive/bone-fracture-detection/`, open the notebook and run;
-the setup cell mounts Drive and installs `kymatio` and `captum`. Set `DATA_DIR` to where the data is.
+```bash
+pytest -m "not slow"   # ~2-5 min on a CPU: data, duplicates, models, training, every XAI method, report
+pytest -m slow         # the whole notebook on synthetic X-rays (tests/synthetic.py), QUICK mode
+```
+What they prove without the real data: identical classifiers; every method runs on every model and
+Grad-CAM is refused on ScatNet; our Occlusion equals Captum's (to 1e-5); Integrated Gradients
+satisfies completeness; the deletion test ranks the correct map first; grouped folds never split a
+duplicate group; planted flipped/rotated/brightened copies are found; a model overfits 16 images;
+the notebook runs top to bottom. CI runs both on every push (`.github/workflows/tests.yml`).
 
-## Results (last full run, before the refactor)
+## Design choices (and why)
 
-| model | CV accuracy (5-fold) | test accuracy | test F1 (fractured) | test recall (fractured) | parameters |
-|---|---|---|---|---|---|
-| Custom CNN | 97.4 ± 0.5 % | 92.9 % | 92.4 % | 92.4 % | 26.1 M |
-| ResNet18 (pretrained) | 98.3 ± 0.7 % | 94.7 % | 94.4 % | 95.0 % | 11.4 M |
-| ScatNet (J=4, L=8) | 96.7 ± 0.5 % | 90.5 % | 90.2 % | 92.4 % | 125.5 M |
+- **Grey input, 1 channel**: X-rays are grey; 3 identical channels only triple ScatNet's coefficients.
+- **CNN**: 4 conv blocks 32 -> 256 with BN and max-pool; the **first layer is 7x7** so that its filters
+  show a shape that can be compared with the wavelets.
+- **ScatNet**: Kymatio `Scattering2D(J=4, L=8)`, second order: 417 maps on the same 14x14 grid as the
+  CNN; coefficients log-compressed and batch-normalised (their magnitudes span orders).
+- **Same classifier** `flatten -> 512 -> 128 -> 2` (ReLU, dropout 0.5) for every model.
+- **Near-duplicates**: the training set contains copies of the same X-ray. Cross-validation is
+  **grouped** by copy, and test accuracy is also reported on the **clean** test images (no copy in train).
+- **Honest CV**: fold scores at the last epoch (nothing selected on the validation fold); the best model
+  is chosen on CV (`SELECT_BY = "f1"`), never on the test set; the test set is used once, with a
+  bootstrap 95% interval and McNemar tests between models.
+- **Final models** trained on the whole training split; the separate `val` split picks the epoch.
+- **XAI**: six methods from four families, so the discussion can compare them and show that
+  **Grad-CAM cannot be applied to ScatNet** (no learned conv feature map) and **Guided Backprop only
+  partly** (the scattering non-linearity is a modulus, not a ReLU). "Removed" pixels are **black**
+  (the X-ray background): a grey baseline made the first version highlight the background.
+- **Quality of the attributions** is measured, not only looked at: deletion test (faithfulness) and
+  Spearman agreement between methods.
 
-Test set: 506 images (238 fractured, 268 not fractured). All models exceed the 75 % target.
-An earlier ScatNet with global average pooling of the coefficients reached only 80.2 % test
-accuracy, most likely because pooling throws away *where* in the image each wavelet responds.
+## Previous iteration and what changed
 
-## Known issues / next steps
+The first version (branch `xai`, team notebook) reached CV 97.4 / 98.3 / 96.7% and test 92.9 / 94.7 /
+90.5% for CNN / ResNet18 / ScatNet (logs in `docs/previous_run/`). It had: different classifiers for
+CNN and ScatNet, CV folds mixing copies of an X-ray and scored at the best epoch (4-6 points CV/test
+gap), RGB input, a grey Occlusion baseline, F1 computed for the wrong class, and no Kaggle setup.
+All fixed here. The old notebooks and attribution files are in the history of branch `xai`.
 
-1. **Classifier heads differ (exam requirement).** The exam asks for the same final classifier
-   in CNN and ScatNet except for the number of input neurons. The CNN head is
-   `Linear(→512) → ReLU → Dropout → Linear(512→128) → ReLU → Dropout → Linear(128→2)`, the ScatNet
-   head is `Linear(→512) → BatchNorm → ReLU → Dropout → Linear(512→2)`. Fixing it means
-   retraining one of the two models.
-2. **CV is optimistic.** CV accuracy is 3.7 to 6.2 points above test accuracy for every model. The training
-   folder may contain several (augmented) versions of the same X-ray, which then end up on
-   both sides of a CV split. A duplicate check (image hashes) would confirm it.
-3. **Occlusion baseline.** With `baseline=0.0` (grey) Occlusion highlights the black background,
-   because a grey square on black is an unrealistic input. `XAI_PARAMS["baseline"] = -1.0` (black)
-   is the better choice for X-rays; it changes IG, LIME and Shapley too.
-4. **Behaviour changes made in the refactor** (re-run with `TRAIN = True` to get consistent numbers):
-   - CV validation folds are no longer evaluated with training augmentation, folds are stratified;
-   - the saved model is the best fold (before: always the last fold);
-   - F1/precision/recall are computed for *fractured* (before: *not fractured*);
-   - every XAI method explains the true class (before: LIME/Shapley used the predicted class);
-   - the from-scratch Occlusion now averages overlapping windows like Captum, so the two match
-     exactly (tested on a random CNN: max difference 5e-8; before: r = 0.97);
-   - confusion-matrix labels come from the dataset (before: 3 of 4 plots had swapped labels);
-   - the ScatNet saliency is computed with ScatNet (before: accidentally with the CNN).
-5. **Revoke the Kaggle API key** that was committed in the old notebook (redacted in `archive/`,
-   but still present in git history).
-6. **Not yet verified end to end:** the new notebook has not been run on the real data. Run it
-   once with `TRAIN = False` (or `True`) before submitting.
+> **Security**: a Kaggle API key was committed in an old notebook (branch `xai` history). Revoke it
+> on kaggle.com (Settings -> API -> Expire token) if not done yet.
 
 ## References
 
-Captum (captum.ai), Kymatio (kymat.io); Bruna & Mallat 2013 (scattering networks), Sundararajan
-et al. 2017 (Integrated Gradients), Ribeiro et al. 2016 (LIME), Zeiler & Fergus 2014 (Occlusion).
+Bruna & Mallat 2013 (scattering networks) · Simonyan et al. 2014 (saliency) · Springenberg et al.
+2015 (guided backprop) · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan
+et al. 2017 (integrated gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion /
+region perturbation) · Captum (captum.ai) · Kymatio (kymat.io).
 
 Course instructors: Prof. Gloria Menegaz, Giorgio Dolci.

@@ -16,7 +16,8 @@ from pathlib import Path
 
 import nbformat
 
-SECRET = re.compile(r"""(api[_-]?key|token|secret|password|"key")\s*[:=]\s*['"]?[A-Za-z0-9_\-]{16,}""", re.I)
+# a secret = a long literal string assigned to a key/token/password name (not a call like get_secret(...))
+SECRET = re.compile(r"""(api[_-]?key|token|secret|password|"key")\s*[:=]\s*['"][A-Za-z0-9_\-]{16,}['"]""", re.I)
 ABS_PATH = re.compile(r"""['"](?:[A-Za-z]:\\\\|[A-Za-z]:\\|/Users/|/home/)""")
 
 

@@ -1,23 +1,41 @@
-# Secrets
+# Secrets (never commit them)
 keys.txt
 *token*.txt
 kaggle.json
+.env
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
 
-# Python
+# Python / Jupyter
 __pycache__/
 *.pyc
-
-# Jupyter
+.pytest_cache/
 .ipynb_checkpoints/
 
 # Course material
 labs/
 
-# Dataset and trained weights (too large for git)
+# Dataset, image cache, Kaggle downloads (too large for git)
+data/
+cache/
+out/
 Bone_Fracture_Binary_Classification/
+
+# Trained weights and cached attribution maps (large; they come back with ./run.sh get)
+results/models/
+results/attributions/
 *.pth
+
+# LaTeX build files
+presentation/*.aux
+presentation/*.log
+presentation/*.nav
+presentation/*.out
+presentation/*.snm
+presentation/*.toc
+presentation/*.vrb
+presentation/*.fls
+presentation/*.fdb_latexmk
