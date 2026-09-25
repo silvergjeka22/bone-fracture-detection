@@ -39,7 +39,9 @@ scratch" requirement).
 
 ## Rules for the notebook
 
-1. **Setup cell**: detect Colab vs local, set `PROJECT_ROOT`, `sys.path.insert`, `from src import ...`.
+1. **Setup cell**: get the code (on Kaggle: clone the repo; locally: the repo root), `sys.path.insert`,
+   then one call to `src/bootstrap.py::setup()` that installs missing packages, finds the data and makes
+   the output folders (see this project's `kaggle-run` skill for the Kaggle GPU pattern).
 2. **Settings cell**: every tunable in one place (paths, model list, epochs, `TRAIN = False`
    flag, method parameters as a dict). It is the only cell a user should need to edit.
 3. **Then one section per step of the pipeline**: a markdown cell saying *what and why*, then

@@ -53,3 +53,11 @@ plots.plot_confusion_matrices(test, class_names, save_to=FIG_DIR / "confusion_ma
 Verification that worked without the dataset or a GPU: the from-scratch Occlusion was
 compared with Captum on a random CNN (max difference 5e-8), and the whole notebook was run
 on 24 random images with 1 epoch and tiny XAI parameters.
+
+## Second pass (September 2026)
+
+On top of the structure above: `src/bootstrap.py` (Kaggle/Colab/local setup), `src/report.py`
+(summary.json + LaTeX macros so the slides never contain hand-typed numbers), `tests/` with a
+synthetic X-ray generator and an end-to-end notebook test, `kernel-metadata.json` + `run.sh` to run
+on a Kaggle GPU, `presentation/` (beamer, built from `results/`). `archive/` was dropped from the
+tree (still in the history of branch `xai`).

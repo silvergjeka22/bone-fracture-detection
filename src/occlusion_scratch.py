@@ -1,8 +1,9 @@
 """Occlusion implemented from scratch: the XAI method we re-implement and compare with Captum.
 
 Algorithm (Zeiler & Fergus, 2014):
-    1. compute the score of the target class on the original image;
-    2. slide a window over the image and replace the pixels under it with a baseline value;
+    1. compute the score (logit) of the target class on the original image;
+    2. slide a window over the image and replace the pixels under it with a baseline value
+       (black, the X-ray background);
     3. the drop of the target score is the importance of the occluded pixels;
     4. each pixel receives the average drop over all the windows that covered it.
 
@@ -18,7 +19,7 @@ import torch
 
 
 @torch.no_grad()
-def occlusion_scratch(model, x, target, window=8, stride=4, baseline=0.0, batch_size=64):
+def occlusion_scratch(model, x, target, window=16, stride=8, baseline=-1.0, batch_size=64):
     """Occlusion map (H, W) for one image `x` of shape (1, C, H, W)."""
     model.eval()
     _, _, height, width = x.shape
@@ -31,7 +32,7 @@ def occlusion_scratch(model, x, target, window=8, stride=4, baseline=0.0, batch_
 
     total = torch.zeros(height, width, device=x.device)  # sum of score drops per pixel
     count = torch.zeros(height, width, device=x.device)  # number of windows covering each pixel
-    for start in range(0, len(corners), batch_size):  # occluded copies are scored in batches
+    for start in range(0, len(corners), batch_size):     # occluded copies are scored in batches
         chunk = corners[start:start + batch_size]
         batch = x.repeat(len(chunk), 1, 1, 1)
         for k, (r, c) in enumerate(chunk):
@@ -40,7 +41,7 @@ def occlusion_scratch(model, x, target, window=8, stride=4, baseline=0.0, batch_
         for k, (r, c) in enumerate(chunk):
             total[r:r + window, c:c + window] += drops[k]
             count[r:r + window, c:c + window] += 1
-    return (total / count).cpu().numpy()
+    return (total / count.clamp_min(1)).cpu().numpy()
 
 
 def compare(scratch_maps, captum_maps):
