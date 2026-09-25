@@ -72,6 +72,9 @@ def latex_macros(summary):
         lines.append(f"\\newcommand{{\\{name}}}{{{value}}}")
 
     best = summary["best_model"]
+    settings = summary.get("settings", {})
+    add("Epochs", settings.get("epochs", "--"))
+    add("KFolds", settings.get("k_folds", "--"))
     add("BestModel", MODEL_LABELS.get(best, best))
     add("BestModelKey", best)
     add("SelectBy", {"f1": "F1", "accuracy": "accuracy"}.get(summary["select_by"], summary["select_by"]))
@@ -118,7 +121,10 @@ def latex_macros(summary):
 def to_latex(table, index_name=""):
     """DataFrame -> booktabs tabular (no pandas LaTeX dependency on jinja2)."""
     def esc(v):
-        text = f"{v:.3f}" if isinstance(v, (float, np.floating)) else str(v)
+        if isinstance(v, (float, np.floating)):
+            text = "--" if np.isnan(v) else f"{v:.1f}" if abs(v) >= 1 else f"{v:.3f}"
+        else:
+            text = str(v)
         return text.replace("\\", "\\textbackslash{}").replace("%", "\\%").replace("_", "\\_").replace(
             "&", "\\&").replace("±", "$\\pm$").replace("#", "\\#")
 

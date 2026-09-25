@@ -13,7 +13,7 @@ wraps the Kaggle CLI, `src/bootstrap.py` prepares the kernel.
 
 | file | role |
 |---|---|
-| `kernel-metadata.json` | kernel id (`<kaggle-user>/bone-fracture-detection`), GPU + internet on, **dataset attached**: `bmadushanirodrigo/fracture-multi-region-x-ray-data` |
+| `kernel-metadata.json` | kernel id (`<kaggle-user>/bone-fracture-detection`), GPU (T4) + internet on, **dataset attached**: `bmadushanirodrigo/fracture-multi-region-x-ray-data` |
 | `run.sh` | `push [--quick]`, `status`, `get`, `slides`, `stop` |
 | notebook cell 1 | on Kaggle clones the private repo (`BRANCH`, default `main`) with the `GITHUB_TOKEN` secret into `/tmp` |
 | `src/bootstrap.setup()` | pip-installs kymatio + captum only, finds the dataset under `/kaggle/input`, results -> `/kaggle/working/results` (the kernel output), image cache -> `/tmp` |
@@ -22,12 +22,12 @@ wraps the Kaggle CLI, `src/bootstrap.py` prepares the kernel.
 
 ## Workflow
 
-1. One-time: `pip install kaggle`, `~/.kaggle/kaggle.json` (chmod 600), Kaggle Secret `GITHUB_TOKEN`
+1. One-time: `pip install kaggle` + `kaggle auth login` (or `~/.kaggle/access_token` / legacy `kaggle.json`), Kaggle Secret `GITHUB_TOKEN`
    (a GitHub token that can read the repo), own username in `kernel-metadata.json` `id`.
 2. Code must be **pushed to GitHub** first: the kernel clones it. For an unmerged branch:
    `BRANCH=my-branch ./run.sh push`.
 3. Health check (~5 min): `./run.sh push --quick` -> `./run.sh status` until `complete` -> `./run.sh get`.
-4. Full run (~3-4 h on a P100/T4): `./run.sh push`. The PC can be switched off.
+4. Full run (~2-3 h on a T4, 12 h is the limit): `./run.sh push`. The PC can be switched off.
 5. `./run.sh get` downloads into `./out` and copies `out/results` into `./results`
    (`summary.json`, `cv/`, `final/`, `figures/`, `latex/`, `models/*.pth`, `attributions/*.npz`).
 6. `./run.sh slides` rebuilds `presentation/main.pdf` with the new numbers.
@@ -46,6 +46,7 @@ output attached) with `TRAIN = False`; it reloads `results/models/*.pth` and the
 | old code runs | kernel cloned `main` but the change is on a branch: `BRANCH=<branch> ./run.sh push` |
 | `cannot import name 'sph_harm'` | SciPy >= 1.17 with Kymatio 0.3: `src/utils.patch_scipy_for_kymatio()` must run before `import kymatio` (models.py and plots.py do it) |
 | ResNet18 weights download fails | internet disabled: `enable_internet: true` |
+| `PyTorch cannot run on Tesla P100` / `no kernel image is available` | recent PyTorch dropped the P100: keep `machine_shape: NvidiaTeslaT4` (or pick T4 in the kernel settings) |
 | CUDA out of memory | lower `BATCH_SIZE` in the Settings cell (ScatNet's classifier has 42M weights) |
 | killed after 12 h, no output | a commit that exceeds the limit saves nothing: lower `EPOCHS`/`K_FOLDS` or drop `resnet18` from `MODELS` |
 | `kaggle: command not found` | `pip install kaggle` on the machine that runs `run.sh` |

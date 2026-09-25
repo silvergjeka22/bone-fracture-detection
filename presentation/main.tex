@@ -197,7 +197,7 @@ $1 + JL + L^2\tfrac{J(J-1)}{2} = 1+32+384 = \mathbf{417}$ maps of $\tfrac{224}{2
 \centering
 \begin{tikzpicture}[node distance=4mm and 6mm]
   \node[blk=ink2, text width=2.2cm] (tr) {\textbf{train} split\\\NTrain{} images};
-  \node[blk=cnn, right=of tr, text width=3.5cm] (cv) {5-fold CV, stratified,\\\textbf{grouped by duplicates}\\score at the \textbf{last} epoch};
+  \node[blk=cnn, right=of tr, text width=3.5cm] (cv) {\KFolds-fold CV, stratified,\\\textbf{grouped by duplicates}\\score at the \textbf{last} epoch};
   \node[blk=cnn, right=of cv, text width=2.9cm] (sel) {mean acc, mean F1\\\textbf{best model} by CV \SelectBy};
   \node[blk=scat, below=6mm of cv, text width=3.5cm] (fin) {final training on all of train\\val (\NVal) picks the epoch};
   \node[blk=scat, right=of fin, text width=2.9cm] (te) {\textbf{test} (\NTest), once\\accuracy + 95\% CI, clean test, McNemar};
@@ -210,7 +210,7 @@ $1 + JL + L^2\tfrac{J(J-1)}{2} = 1+32+384 = \mathbf{417}$ maps of $\tfrac{224}{2
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}\small
 \begin{itemize}
-  \item AdamW, weight decay $10^{-4}$, cosine schedule, 15 epochs, batch 32
+  \item AdamW, weight decay $10^{-4}$, cosine schedule, \Epochs{} epochs, batch 32
   \item lr $10^{-3}$ (CNN, ScatNet), $10^{-4}$ (ResNet18 fine-tuning)
   \item cross-entropy; F1/recall for the \alert{fractured} class
 \end{itemize}
@@ -227,7 +227,7 @@ $1 + JL + L^2\tfrac{J(J-1)}{2} = 1+32+384 = \mathbf{417}$ maps of $\tfrac{224}{2
 
 % ================================================================ 8
 \section{Results}
-\begin{frame}{Cross-validation on the training set (mean $\pm$ std over 5 folds, \%)}
+\begin{frame}{Cross-validation on the training set (mean $\pm$ std over \KFolds{} folds, \%)}
 \resulttable[0.82\linewidth]{cv}
 
 \medskip

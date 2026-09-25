@@ -6,8 +6,11 @@
   "kernel_type": "notebook",
   "is_private": true,
   "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
   "enable_internet": true,
-  "dataset_sources": ["bmadushanirodrigo/fracture-multi-region-x-ray-data"],
+  "dataset_sources": [
+    "bmadushanirodrigo/fracture-multi-region-x-ray-data"
+  ],
   "competition_sources": [],
   "kernel_sources": []
 }
