@@ -2,7 +2,7 @@
 # Run the notebook on a Kaggle GPU kernel from your terminal, then fetch the results.
 #
 # One-time setup (see README, "Run it on Kaggle"):
-#   1) pip install kaggle           and put kaggle.json in ~/.kaggle/ (chmod 600)
+#   1) pip install kaggle, then `kaggle auth login` (or a token in ~/.kaggle/access_token or kaggle.json)
 #   2) on kaggle.com add a Secret GITHUB_TOKEN (a GitHub token that can read this private repo)
 #   3) put YOUR Kaggle username in kernel-metadata.json ("id": "<username>/bone-fracture-detection")
 #

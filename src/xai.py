@@ -185,6 +185,8 @@ def deletion_curves(model, images, targets, maps, patch=16, steps=20, n_random=5
     rng = np.random.default_rng(seed)
     curves = {}
     for name, m in available(maps).items():
+        if name not in METHODS:  # our Occlusion equals Captum's: compared on its own in scratch_vs_captum
+            continue
         curves[name] = np.stack([deletion_curve(model, img[None].to(device), int(t), a, patch, steps)
                                  for img, t, a in zip(images, targets, m)])
     height, width = images.shape[-2:]
@@ -214,7 +216,7 @@ def agreement_matrix(maps, patch=16):
         a = a[:, :h // patch * patch, :w // patch * patch]
         return np.abs(a).reshape(n, h // patch, patch, w // patch, patch).mean(axis=(2, 4)).reshape(n, -1)
 
-    maps = available(maps)
+    maps = {k: v for k, v in available(maps).items() if k in METHODS}
     names = list(maps)
     regions = {name: pooled(maps[name]) for name in names}
     matrix = pd.DataFrame(np.eye(len(names)), index=names, columns=names)

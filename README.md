@@ -66,13 +66,15 @@ Same pattern as `macura-drone`: the job runs on a Kaggle GPU, launched from your
 switch the PC off and download the results later.
 
 **One-time setup**
-1. `pip install kaggle`; on kaggle.com: Settings -> *Create New Token*, save it as `~/.kaggle/kaggle.json`
-   (`chmod 600`; Windows: `C:\Users\<you>\.kaggle\kaggle.json`).
+1. `pip install kaggle`, then log in once: `kaggle auth login` (browser), or create a token on
+   kaggle.com (Settings -> API) and save it as `~/.kaggle/access_token` (newer CLI) or the legacy
+   `~/.kaggle/kaggle.json` (`chmod 600`; Windows: `C:\Users\<you>\.kaggle\`).
 2. On kaggle.com add a **Secret** `GITHUB_TOKEN`: a GitHub token that can read this private repo
    (the kernel clones the code with it).
 3. Put your Kaggle username in `kernel-metadata.json` (`"id": "<username>/bone-fracture-detection"`).
 
-`kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` and `enable_internet` true (clone +
+`kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` with `machine_shape: NvidiaTeslaT4`
+(recent PyTorch builds no longer support the older P100), `enable_internet` true (clone +
 pip install kymatio/captum + ResNet18 weights), `dataset_sources` =
 `bmadushanirodrigo/fracture-multi-region-x-ray-data` (mounted read-only under `/kaggle/input`).
 
@@ -80,7 +82,7 @@ pip install kymatio/captum + ResNet18 weights), `dataset_sources` =
 ```bash
 ./run.sh push --quick     # 5-minute health check on a small subset (do it once)
 ./run.sh status           # queued / running / complete / error
-./run.sh push             # the full run, ~3-4 h on a P100/T4 (5-fold CV x 3 models + final training + XAI)
+./run.sh push             # the full run, ~2-3 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI)
 ./run.sh get              # download into ./out and copy the results into ./results
 ./run.sh slides           # rebuild presentation/main.pdf with the new numbers
 ```

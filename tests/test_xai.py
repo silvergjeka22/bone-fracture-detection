@@ -89,19 +89,20 @@ def test_deletion_rewards_the_right_map():
     right[:16, :16] = 1
     wrong = np.zeros((SIZE, SIZE))
     wrong[-16:, -16:] = 1
-    curves = xai.deletion_curves(TopLeft(), x, torch.tensor([0]), {"right": right[None], "wrong": wrong[None]},
+    curves = xai.deletion_curves(TopLeft(), x, torch.tensor([0]), {"Occlusion": right[None], "LIME": wrong[None]},
                                  patch=16, steps=16)
     table = xai.deletion_table(curves)
-    assert table.index[0] == "right"
+    auc = table["deletion AUC (mean)"]
+    assert table.index[0] == "Occlusion" and auc["Occlusion"] < auc["LIME"] - 0.02  # the right map wins clearly
 
 
 def test_agreement_matrix_and_applicability(trained_like):
-    maps = {"a": np.random.rand(2, SIZE, SIZE), "b": np.random.rand(2, SIZE, SIZE),
-            "nan": np.full((2, SIZE, SIZE), np.nan)}
-    maps["a_copy"] = maps["a"] * 3
+    a = np.random.rand(2, SIZE, SIZE)
+    maps = {"Saliency": a, "LIME": np.random.rand(2, SIZE, SIZE), "Grad-CAM": np.full((2, SIZE, SIZE), np.nan),
+            "Occlusion": a * 3, "Occlusion (ours)": a}
     m = xai.agreement_matrix(maps)
-    assert list(m.index) == ["a", "b", "a_copy"]
-    assert m.loc["a", "a_copy"] == pytest.approx(1.0) and abs(m.loc["a", "b"]) < 0.5
+    assert list(m.index) == ["Saliency", "LIME", "Occlusion"]  # NaN maps and our Occlusion are left out
+    assert m.loc["Saliency", "Occlusion"] == pytest.approx(1.0) and abs(m.loc["Saliency", "LIME"]) < 0.5
     table = xai.applicability(trained_like)
     assert table.loc["Grad-CAM", "scatnet"].startswith("no")
     assert table.loc["Grad-CAM", "cnn"] == "yes"

@@ -31,9 +31,10 @@ def test_latex_macros():
 
 
 def test_to_latex_escapes():
-    table = pd.DataFrame({"acc %": ["90.0 ± 1.0"], "F1_score": [0.5]}, index=["cnn"])
+    table = pd.DataFrame({"acc %": ["90.0 ± 1.0"], "F1_score": [0.5], "recall": [56.6]}, index=["cnn"])
     tex = report.to_latex(table)
     assert "\\%" in tex and "$\\pm$" in tex and "F1\\_score" in tex and "CNN" in tex
+    assert "& 0.500 & 56.6 \\\\" in tex  # percentages with 1 decimal, small values with 3
     assert tex.startswith("\\begin{tabular}") and "\\bottomrule" in tex
 
 
