@@ -56,7 +56,8 @@ bone-fracture-detection/
 │                             (models/ and attributions/ are large and gitignored)
 ├── docs/previous_run/        CV logs of the first iteration (before the fixes listed below)
 ├── kernel-metadata.json      Kaggle kernel: GPU, internet, dataset attached
-├── run.sh                    push / status / get / slides / stop
+├── run.sh                    Windows/Linux shell entry point
+├── scripts/kaggle_run.py     private code snapshot + push / status / get
 └── .claude/skills/           kaggle-run, exam-checklist, presentation, ml-project-structure
 ```
 
@@ -66,29 +67,89 @@ Same pattern as `macura-drone`: the job runs on a Kaggle GPU, launched from your
 switch the PC off and download the results later.
 
 **One-time setup**
-1. `pip install kaggle`, then log in once: `kaggle auth login` (browser), or create a token on
-   kaggle.com (Settings -> API) and save it as `~/.kaggle/access_token` (newer CLI) or the legacy
-   `~/.kaggle/kaggle.json` (`chmod 600`; Windows: `C:\Users\<you>\.kaggle\`).
-2. On kaggle.com add a **Secret** `GITHUB_TOKEN`: a GitHub token that can read this private repo
-   (the kernel clones the code with it).
+1. Activate the environment and install the local dependencies:
+   ```bash
+   conda activate bone-fracture
+   python -m pip install -r requirements.txt
+   ```
+2. Make sure the Kaggle account is phone-verified, then authenticate the CLI. OAuth is recommended
+   because it requests the permissions needed to create private Datasets and update Notebooks. If a
+   legacy key exists, move it aside first because it can take precedence over OAuth:
+   ```bash
+   mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup
+   kaggle auth login --force
+   ```
+   Sign in with the same Kaggle account named in `kernel-metadata.json` and accept the requested
+   permissions. If no browser opens, use
+   `kaggle auth login --force --no-launch-browser` and open the displayed URL manually.
 3. Put your Kaggle username in `kernel-metadata.json` (`"id": "<username>/bone-fracture-detection"`).
 
+Do not put Kaggle keys or GitHub tokens in this repository. To restore the old legacy Kaggle key if
+needed, run `mv ~/.kaggle/kaggle.json.backup ~/.kaggle/kaggle.json`.
+
+### Setup for collaborators
+
+After pulling the repository, each collaborator uses their own Kaggle account and credentials.
+Change only the `id` line in `kernel-metadata.json`:
+
+```json
+"id": "COLLABORATOR_KAGGLE_USERNAME/bone-fracture-detection"
+```
+
+Then authenticate locally with that same account:
+
+```bash
+conda activate bone-fracture
+python -m pip install -r requirements.txt
+mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup  # only if the legacy file exists
+kaggle auth login --force
+./run.sh push --quick
+```
+
+No GitHub token is needed on Kaggle. Do not copy or commit another person's `kaggle.json`, access
+token, OAuth credentials, or `kaggle_remember_setup.txt`. The launcher tests derive the expected
+owner from `kernel-metadata.json`, so they do not require a username edit.
+
+GitHub authentication is needed only for `git clone` / `git pull` on your computer. The remote
+kernel never receives a GitHub token: `run.sh` uploads an allowlisted snapshot of `src/*.py` and
+`requirements.txt` as an immutable **private Kaggle Dataset**, then attaches it to the notebook.
+Identical source snapshots reuse that dataset. A changed snapshot creates one small private dataset
+that can later be removed from Kaggle when its reproducibility record is no longer needed.
+
 `kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` with `machine_shape: NvidiaTeslaT4`
-(recent PyTorch builds no longer support the older P100), `enable_internet` true (clone +
-pip install kymatio/captum + ResNet18 weights), `dataset_sources` =
+(recent PyTorch builds no longer support the older P100), `enable_internet` true (pip install
+kymatio/captum + ResNet18 weights), `dataset_sources` =
 `bmadushanirodrigo/fracture-multi-region-x-ray-data` (mounted read-only under `/kaggle/input`).
+The launcher adds the private code snapshot to `dataset_sources` only in its staged metadata.
 
 **Run**
 ```bash
+conda activate bone-fracture
+cd ~/Desktop/bone-fracture-detection
+
+./run.sh push --quick --dry-run  # inspect the staged files locally; no Kaggle connection
 ./run.sh push --quick     # 5-minute health check on a small subset (do it once)
 ./run.sh status           # queued / running / complete / error
 ./run.sh push             # the full run, ~2-3 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI)
 ./run.sh get              # download into ./out and copy the results into ./results
 ./run.sh slides           # rebuild presentation/main.pdf with the new numbers
+./run.sh stop             # print the Kaggle page where a running session can be stopped
+./run.sh                  # show launcher help
 ```
-The kernel clones branch `main`; for another branch: `BRANCH=<branch> ./run.sh push`.
+The launcher uploads the files from the currently checked-out local branch, including uncommitted
+source edits. It records the branch, commit and snapshot checksum in the staged notebook metadata.
+After Kaggle accepts the job, it runs independently and the PC can be switched off. Each download is
+kept in a separate `out/run-<timestamp>/` folder so a failed run cannot erase an earlier result.
 Outputs (in `/kaggle/working/results` on the kernel): `summary.json`, `cv/`, `final/`, `figures/`,
 `latex/`, `models/*.pth`, `attributions/*.npz`.
+
+Recommended order: run `push --quick`, monitor with `status`, and download with `get`. If that
+health check succeeds, start the full run with `push`. Wait for `Kaggle accepted the job; the PC can
+now be switched off.` before closing the terminal or turning off the computer.
+
+If Dataset creation ends with `403 Forbidden` after the file upload reaches 100%, the file transfer
+succeeded but Kaggle rejected creation of the Dataset. Repeat the OAuth setup above and accept the
+Dataset/Notebook permissions; do not add a token to the notebook or repository.
 
 ## Run it locally
 
