@@ -10,7 +10,7 @@ This is a University of Verona MSc AI exam project. The task: binary image class
 
 **Libraries:** PyTorch, Captum, Kymatio, scikit-learn, matplotlib
 
-**Codebase root:** `bone-fracture-detection/`
+**Codebase root:** `bone-fracture-detect   ion/`
 
 **Dataset:** Kaggle "Bone Fracture Multi-Region X-ray Data" — folder structure:
 ```
