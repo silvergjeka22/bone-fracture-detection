@@ -10,6 +10,8 @@ numpy>=1.24
 pandas>=2.0
 matplotlib>=3.7
 pillow>=9.0
+# local remote-run launcher (not installed by src/bootstrap.py on Kaggle)
+kaggle>=2.2.4,<3
 # tests only
 pytest>=7
 nbformat>=5
