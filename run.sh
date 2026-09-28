@@ -13,9 +13,23 @@
 #   ./run.sh stop             open the kernel page (Kaggle has no CLI stop)
 #
 # BRANCH=<git branch> ./run.sh push   makes the kernel clone that branch (default: main).
+# On Windows, run this from Git Bash after `conda activate bone-fracture`.
 set -e
 cd "$(dirname "$0")"
-KERNEL=$(python3 -c "import json; print(json.load(open('kernel-metadata.json'))['id'])")
+
+# Conda on Windows normally exposes `python`, while Linux/macOS installations
+# often expose `python3`. Prefer `python` to avoid Windows' Store `python3`
+# alias, which is not the interpreter from the active Conda environment.
+if command -v python >/dev/null 2>&1; then
+  PYTHON=python
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+else
+  echo "Python was not found. Activate the Conda environment, then retry."
+  exit 127
+fi
+
+KERNEL=$($PYTHON -c "import json; print(json.load(open('kernel-metadata.json'))['id'])")
 BRANCH="${BRANCH:-main}"
 
 case "${1:-help}" in
@@ -23,14 +37,14 @@ case "${1:-help}" in
     # Push a copy of the notebook with BRANCH (and QUICK for --quick) filled in; the repo copy is untouched.
     QUICK=False; [ "${2:-}" = "--quick" ] && QUICK=True
     STAGE=$(mktemp -d)
-    python3 - "$STAGE" "$BRANCH" "$QUICK" <<'EOF'
-import json, sys
+    $PYTHON - "$STAGE" "$BRANCH" "$QUICK" <<'EOF'
+import json, re, sys
 stage, branch, quick = sys.argv[1:]
 nb = json.load(open("notebooks/main.ipynb"))
 for cell in nb["cells"]:
     src = "".join(cell["source"])
-    src = src.replace('REPO, BRANCH = "silvergjeka22/bone-fracture-detection", "main"',
-                      f'REPO, BRANCH = "silvergjeka22/bone-fracture-detection", "{branch}"')
+    src = re.sub(r'(REPO, BRANCH = "silvergjeka22/bone-fracture-detection", ")[^"]*(")',
+                 rf'\g<1>{branch}\g<2>', src)
     src = src.replace("QUICK      = False", f"QUICK      = {quick}")
     cell["source"] = src
 json.dump(nb, open(f"{stage}/main.ipynb", "w"), indent=1)
