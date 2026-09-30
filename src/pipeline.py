@@ -1,13 +1,6 @@
-"""The full pipeline (after Linda, 2025): classifier + detector + explanation -> a short report per X-ray.
+"""Full pipeline after Linda (2025): classifier + YOLO box + explanation -> verdict and report per X-ray.
 
-For every test X-ray:
-    1. the best classifier gives the probability of 'fractured';
-    2. YOLO gives its most confident fracture box (if one is above its confidence threshold);
-    3. for the X-rays called fractured, the best XAI method explains the classifier, and we check that
-       the hottest point of the explanation lies inside YOLO's box (the classifier looks where the
-       detector looks);
-    4. verdict: 'fracture' or 'no fracture' when classifier and detector agree, otherwise 'needs review'
-       (a second look by a radiologist instead of a silent mistake).
+Verdict: 'fracture' / 'no fracture' when classifier and detector agree, otherwise 'needs review'.
 """
 
 from pathlib import Path
@@ -31,11 +24,7 @@ def verdict(p_fractured, has_box, threshold=0.5):
 
 
 def run(model, image_set, probs, detections, method, device, threshold=0.5, **params):
-    """One row per X-ray of `image_set`: classifier probability, detector box, explanation box, verdict, report.
-
-    probs: P(fractured) of each X-ray (e.g. test[BEST]["prob_positive"]); detections: detect.find_boxes output;
-    method: name of the XAI method (xai.METHODS), computed only for the X-rays called fractured.
-    """
+    """One row per X-ray of `image_set`: classifier probability, detector box, explanation box, verdict, report."""
     params = {**DEFAULT_PARAMS, **params}
     model.eval()
     rows = []

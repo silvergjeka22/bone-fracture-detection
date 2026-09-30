@@ -1,9 +1,4 @@
-"""Every figure of the notebook (and of the presentation).
-
-Each function draws one figure, shows it and, if `save_to` is given, also writes it to disk.
-Colours follow the entity everywhere: one fixed colour per model, per class and per XAI method.
-Attribution overlays share one colour code: red = evidence for the class, blue = against it.
-"""
+"""Every figure, one function each; fixed colours per model, class, method and box."""
 
 import textwrap
 from pathlib import Path
@@ -307,13 +302,7 @@ def plot_scattering_filters(J, L, save_to=None):
 
 
 def plot_frequency_coverage(weight, J, L, size=64, save_to=None):
-    """Which spatial frequencies each model looks at: learned CNN filters vs the wavelet tiling.
-
-    Left: sum over the CNN first-layer filters of their normalised power spectrum.
-    Right: the same for the J x L Morlet wavelets, which tile the frequency plane by design
-    (one ring per scale, one petal per orientation). Centre = low frequencies (smooth regions),
-    border = high frequencies (fine edges, thin fracture lines).
-    """
+    """Which spatial frequencies each model looks at: learned CNN filters vs the wavelet tiling."""
     kernels = weight.detach().cpu().float().sum(1).numpy()
     cnn = np.zeros((size, size))
     for k in kernels:
@@ -324,8 +313,7 @@ def plot_frequency_coverage(weight, J, L, size=64, save_to=None):
     for psi in bank["psi"]:
         power = np.fft.fftshift(np.abs(psi["levels"][0])) ** 2
         wav += power / (power.max() or 1)
-    # a Morlet wavelet covers one half of the plane; for a real image |x * psi| = |x * conj(psi)|,
-    # so its mirror half is covered too
+    # for a real image |x * psi| = |x * conj(psi)|: each wavelet also covers the mirrored half of the plane
     wav = wav + np.roll(wav[::-1, ::-1], 1, axis=(0, 1))
     fig, axes = plt.subplots(1, 2, figsize=(7.6, 3.8))
     for ax, image, title in [(axes[0], cnn, f"CNN: {len(kernels)} learned filters"),
@@ -341,8 +329,7 @@ def plot_frequency_coverage(weight, J, L, size=64, save_to=None):
 # ----------------------------------------------------------------------------- XAI
 
 def _overlay(ax, image, attribution, smooth=1.0):
-    """Grey X-ray + attribution: colours clipped at the 99th percentile of |attribution|,
-    transparency following |attribution|, so weak (noisy) values fade out instead of hiding the bone."""
+    """Grey X-ray + attribution (red = for the class, blue = against); weak values fade out."""
     ax.imshow(denormalize(image), cmap="gray", vmin=0, vmax=1)
     if np.isnan(attribution).all():
         ax.text(0.5, 0.5, "not\napplicable", transform=ax.transAxes, ha="center", va="center",
@@ -355,8 +342,7 @@ def _overlay(ax, image, attribution, smooth=1.0):
     ax.axis("off")
 
 
-def plot_attribution_grid(images, labels, maps, class_names, methods=None, preds=None,
-                          indices=None, title=None, save_to=None):
+def plot_attribution_grid(images, labels, maps, class_names, methods=None, indices=None, title=None, save_to=None):
     """Rows = images, columns = the X-ray + one overlay per XAI method."""
     methods = list(methods or maps)
     indices = list(range(len(images))) if indices is None else list(indices)
@@ -366,12 +352,7 @@ def plot_attribution_grid(images, labels, maps, class_names, methods=None, preds
         ax = axes[row, 0]
         ax.imshow(denormalize(images[i]), cmap="gray", vmin=0, vmax=1)
         ax.axis("off")
-        text = f"true: {class_names[labels[i]]}"
-        color = INK
-        if preds is not None:
-            text += f"\npredicted: {class_names[preds[i]]}"
-            color = INK if preds[i] == labels[i] else "#d03b3b"
-        ax.set_title(text, fontsize=8.5, color=color)
+        ax.set_title(f"true: {class_names[labels[i]]}", fontsize=8.5, color=INK)
         for col, method in enumerate(methods, start=1):
             _overlay(axes[row, col], images[i], maps[method][i])
             if row == 0:
@@ -415,8 +396,7 @@ def plot_agreement(matrices, save_to=None):
 
 
 def plot_deletion_curves(curves, save_to=None):
-    """Deletion test ({model: {method: (N, steps+1)}}): probability of the class while the most
-    important patches are blacked out first. Faster drop (lower curve) = more faithful map."""
+    """Deletion test: probability of the class while the most important patches are removed (lower = better)."""
     fig, axes = plt.subplots(1, len(curves), figsize=(4.4 * len(curves), 3.6), squeeze=False, sharey=True)
     for ax, (name, by_method) in zip(axes[0], curves.items()):
         for method, c in by_method.items():
@@ -436,8 +416,7 @@ def plot_deletion_curves(curves, save_to=None):
 # ----------------------------------------------------------------------------- fracture boxes
 
 def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, title=None, save_to=None):
-    """Rows = fractured X-rays, columns = XAI methods. Radiologist's box (dashed), our box (solid) and
-    the evidence for 'fractured': strong inside our box, faint outside it (so nothing is hidden)."""
+    """Rows = fractured X-rays, columns = methods: radiologist's box (dashed), our box, evidence (faint outside)."""
     methods = list(methods or maps)
     fig, axes = plt.subplots(len(images), len(methods), figsize=(2.0 * len(methods), 2.15 * len(images)),
                              squeeze=False)
@@ -475,9 +454,7 @@ def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, t
 
 
 def plot_localization(tables, detector=None, save_to=None):
-    """Pointing game ({model: localization table}): how often the hottest point of each method's map
-    lies inside a radiologist's box. Dashed lines: a random point and, if given, the hit rate of the
-    detector trained on the boxes (YOLO)."""
+    """Pointing game per method and model, with a random point and YOLO as dashed lines."""
     methods = [m for m in METHOD_COLORS if m not in ("Random", "Occlusion (ours)")
                and any(m in t.index for t in tables.values())]
     random = next(iter(tables.values())).loc["Random", "hit rate (%)"]  # same images for every model
@@ -504,8 +481,7 @@ def plot_localization(tables, detector=None, save_to=None):
 
 
 def plot_pipeline_examples(image_set, cases, n=4, save_to=None):
-    """A few test X-rays through the full pipeline: radiologist's box (dashed), YOLO's box, the explanation's
-    box, and the report. One example per outcome when possible: found fracture, needs review, healthy, mistake."""
+    """A few test X-rays through the pipeline: radiologist's, YOLO's and the explanation's box + the report."""
     kinds = [(cases["true"] == "fractured") & (cases["verdict"] == "fracture"),
              cases["verdict"] == "needs review",
              (cases["true"] != "fractured") & (cases["verdict"] == "no fracture"),

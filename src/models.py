@@ -1,14 +1,6 @@
-"""The models compared in the project.
+"""CNN, ScatNet and ResNet18: different feature extractors, the same Classifier (exam requirement).
 
-Every model = feature extractor + the SAME `Classifier` (exam requirement: only the number of
-input neurons may differ). Input: one grey channel, 224x224, normalised to [-1, 1].
-
-    cnn       4 learned conv blocks                       -> 256 maps of 14x14 -> Classifier(50,176)
-    scatnet   fixed wavelet scattering (Kymatio, J=4, L=8) -> 417 maps of 14x14 -> Classifier(81,732)
-    resnet18  ImageNet-pretrained ResNet18 (fine-tuned)   -> 512 features      -> Classifier(512)
-
-CNN and ScatNet both end on a 14x14 grid (224 / 2^4): the CNN through 4 max-poolings, ScatNet
-through its low-pass averaging at scale 2^J = 16 pixels, so their classifiers see the same layout.
+CNN and ScatNet both end on a 14x14 grid (224 / 16), so only the classifier's input size differs.
 """
 
 import pandas as pd
@@ -47,11 +39,7 @@ def conv_block(in_channels, out_channels, kernel_size=3):
 
 
 class BoneFractureCNN(nn.Module):
-    """4 conv blocks with 32 -> 64 -> 128 -> 256 filters.
-
-    The first layer uses 7x7 filters (the others 3x3): large enough to show clear edge/texture
-    detectors, which we compare with the ScatNet wavelets.
-    """
+    """4 conv blocks with 32 -> 64 -> 128 -> 256 filters."""
 
     def __init__(self, image_size=224, num_classes=2, dropout=0.5):
         super().__init__()
@@ -78,14 +66,7 @@ class BoneFractureCNN(nn.Module):
 
 
 class ScatNet(nn.Module):
-    """Wavelet scattering transform (fixed, nothing learned) + the shared classifier.
-
-    Scattering2D(J, L) filters the image with Morlet wavelets at J scales and L orientations,
-    takes the modulus, repeats once (2nd order) and averages every map over 2^J pixels:
-    1 + J*L + L^2*J*(J-1)/2 = 417 coefficient maps of 14x14 for J=4, L=8.
-    The coefficients are log-compressed and batch-normalised (their magnitudes span several
-    orders), which is the only trainable part besides the classifier.
-    """
+    """Wavelet scattering transform (fixed, nothing learned) + the shared classifier."""
 
     def __init__(self, image_size=224, J=4, L=8, num_classes=2, dropout=0.5):
         super().__init__()

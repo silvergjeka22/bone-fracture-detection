@@ -1,18 +1,6 @@
-"""Data: find the dataset, load and cache the images and fracture boxes, split, build the data loaders.
+"""FracAtlas: load the X-rays (grey, 224x224) and their fracture boxes, find near-duplicates, split, build loaders.
 
-FracAtlas (Abedeen et al., Scientific Data 2023; Kaggle: mahmudulhasantasin/fracatlas-original-dataset):
-4,083 X-rays of hands, legs, hips and shoulders from three hospitals, 717 of them fractured.
-Radiologists drew a box around every fracture, so we can check whether an explanation points at it.
-
-    <data_dir>/images/Fractured/IMG*.jpg         717 images   (label 0, the positive class)
-    <data_dir>/images/Non_fractured/IMG*.jpg     3,366 images (label 1)
-    <data_dir>/Annotations/YOLO/IMG*.txt         boxes of the fractured images, one "class cx cy w h"
-                                                 line per fracture, normalised to [0, 1]
-
-There is no official split: `split_indices` makes a stratified train / val / test split in which
-copies of the same X-ray (near-duplicates) always stay together.
-X-rays are grey, so every image is loaded as ONE channel, resized to 224x224 and kept in memory as
-uint8; the boxes are rescaled with it.
+Labels: 0 = fractured (the positive class), 1 = not fractured.
 """
 
 import os
@@ -64,8 +52,7 @@ class ImageSet:
     paths: list          # file path of every image
     sizes: np.ndarray    # (N, 2) original width and height in pixels
     class_names: list
-    boxes: list          # per image: (k, 4) float array of fracture boxes (x0, y0, x1, y1) in pixels of
-                         # the S x S image; k = 0 for a healthy X-ray
+    boxes: list          # per image: (k, 4) fracture boxes (x0, y0, x1, y1) in pixels, k = 0 if healthy
 
     def __len__(self):
         return len(self.labels)
@@ -94,11 +81,7 @@ def _read(path, size):
 
 
 def read_boxes(path, size):
-    """Boxes of one YOLO file as a (k, 4) array (x0, y0, x1, y1) in pixels of the size x size image.
-
-    YOLO coordinates are fractions of the width and height, so they survive the resize unchanged.
-    No file (a healthy X-ray) -> no box.
-    """
+    """Boxes of one YOLO file as a (k, 4) array (x0, y0, x1, y1) in pixels of the size x size image."""
     path = Path(path)
     if not path.exists() or path.stat().st_size == 0:
         return np.zeros((0, 4), np.float32)
@@ -107,11 +90,7 @@ def read_boxes(path, size):
 
 
 def load_dataset(data_dir, size=IMAGE_SIZE, cache_dir=None, max_per_class=None, seed=0, workers=8):
-    """Every image of the dataset and its fracture boxes, as one ImageSet.
-
-    The decoded images are cached as .npz in `cache_dir`; the boxes (small text files) are read every time.
-    `max_per_class` keeps a random subset of each class (quick test runs).
-    """
+    """Every image and its fracture boxes as one ImageSet; decoded images are cached in cache_dir."""
     data_dir = Path(data_dir)
     cache = Path(cache_dir) / f"fracatlas_{size}px_{max_per_class or 'all'}.npz" if cache_dir else None
     if cache is not None and cache.exists():
@@ -146,11 +125,7 @@ def load_dataset(data_dir, size=IMAGE_SIZE, cache_dir=None, max_per_class=None, 
 
 
 def split_indices(labels, groups, val=0.15, test=0.15, seed=0):
-    """Stratified train / val / test indices; near-duplicates (same group) never cross splits.
-
-    Each part is one fold of a stratified group k-fold (k = 1 / fraction), so the sizes are close
-    to, not exactly, the requested fractions.
-    """
+    """Stratified train / val / test indices; near-duplicates (same group) never cross splits."""
     labels, groups = np.asarray(labels), np.asarray(groups)
 
     def carve(pool, fraction):
@@ -165,9 +140,7 @@ def split_indices(labels, groups, val=0.15, test=0.15, seed=0):
 
 # ----------------------------------------------------------------------------- training data
 
-# Random, anatomically plausible changes, applied only to training images: left/right flip,
-# small rotation / shift / zoom (the empty border is black, like the X-ray background) and
-# brightness / contrast (different X-ray machines and exposures).
+# training images only: flip, small rotation / shift / zoom, brightness / contrast
 AUGMENT = v2.Compose([
     v2.RandomHorizontalFlip(),
     v2.RandomAffine(degrees=10, translate=(0.05, 0.05), scale=(0.9, 1.1)),
@@ -249,13 +222,7 @@ def _thumbnails(images, size, device):
 
 
 def near_duplicates(images, threshold=0.97, size=32, device="cpu", chunk=512):
-    """Pairs of images (i < j) that show the same X-ray: DataFrame(i, j, similarity).
-
-    Two images match when the cosine similarity of their 32x32 zero-mean thumbnails is >= threshold
-    for one of the 8 flips/90° rotations. This finds copies that were resized, re-compressed,
-    flipped, rotated by 90° or changed in brightness/contrast; copies rotated by other angles or
-    cropped are missed, so the counts are a lower bound.
-    """
+    """Pairs (i < j) of images showing the same X-ray (32x32 thumbnails, 8 flips/rotations, cosine >= threshold)."""
     views = _thumbnails(images, size, device)
     rows = []
     for start in range(0, views.shape[1], chunk):
@@ -275,11 +242,7 @@ def duplicate_groups(n, pairs):
 
 
 def study_duplicates(image_set, threshold=0.97, device="cpu"):
-    """Near-duplicates in the dataset: a group id per image (copies share one), the pairs, a summary table.
-
-    The groups keep the copies of one X-ray together in the train / val / test split and in the
-    cross-validation folds.
-    """
+    """Near-duplicates in the dataset: a group id per image (copies share one), the pairs, a summary table."""
     pairs = near_duplicates(image_set.images, threshold=threshold, device=device)
     groups = duplicate_groups(len(image_set), pairs)
     sizes = np.bincount(groups)

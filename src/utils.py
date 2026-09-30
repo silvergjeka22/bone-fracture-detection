@@ -1,4 +1,4 @@
-"""Small helpers: reproducibility, device, parameter count, a Kymatio/SciPy compatibility fix."""
+"""Small helpers: seed, device, parameter count, Kymatio/SciPy fix."""
 
 import random
 
@@ -32,11 +32,7 @@ def count_parameters(model, trainable_only=True):
 
 
 def patch_scipy_for_kymatio():
-    """Kymatio 0.3 imports `scipy.special.sph_harm`, which SciPy 1.17 removed (renamed `sph_harm_y`).
-
-    Only the 3D scattering uses it, but the import of `kymatio.torch` fails without it,
-    so we put back an alias with the old argument order before importing Kymatio.
-    """
+    """Kymatio 0.3 imports scipy.special.sph_harm, removed in SciPy 1.17: put back an alias."""
     import scipy.special as special
 
     if not hasattr(special, "sph_harm"):

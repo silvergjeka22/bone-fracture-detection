@@ -1,17 +1,6 @@
-"""Training and evaluation: k-fold cross-validation, final training, test metrics, statistical tests.
+"""Training and evaluation: grouped k-fold CV, final training, test metrics, McNemar, tables.
 
-Protocol
-    1. k-fold cross-validation on the TRAINING split -> mean accuracy and mean F1 (generalisation estimate).
-       Folds are stratified by class and grouped by near-duplicate, so copies of the same X-ray
-       are never on both sides of a split. Fold metrics are taken at the last epoch: nothing is
-       chosen on the validation fold, so the estimate is not optimistic.
-    2. Final model: trained on the whole training split; the VAL split picks the best epoch.
-    3. TEST split: used once, to evaluate the final models.
-
-The loss weights each class by its inverse frequency (`class_weights`): about 1 X-ray in 6 is
-fractured, and an unweighted loss would learn to miss fractures.
-
-Files written to results_dir:  cv/<model>.json, final/<model>.json, models/<model>.pth
+The loss weights each class by its inverse frequency (1 X-ray in 6 is fractured).
 """
 
 import copy
@@ -96,13 +85,7 @@ def predict(model, loader, device, weight=None):
 
 
 def fit(model, train_loader, val_loader, device, epochs=15, lr=1e-3, weight_decay=1e-4, keep_best=False, tag=""):
-    """Train with AdamW and a cosine learning-rate schedule, evaluating on `val_loader` after every epoch.
-
-    The loss is weighted by `class_weights` of the training images, on the training and on the
-    validation data, so that the two loss curves are comparable.
-    keep_best=True restores the weights of the epoch with the best validation accuracy.
-    Returns the history (train and validation loss/accuracy per epoch) and the kept epoch.
-    """
+    """Train with AdamW + cosine schedule, evaluate on val_loader each epoch; returns (history, kept epoch)."""
     train_data = train_loader.dataset
     weight = class_weights(train_data.labels[train_data.indices])
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -255,11 +238,7 @@ def comparison_table(cv, test, final):
 
 
 def select_best(cv, metric="f1"):
-    """Model with the highest mean cross-validation `metric`.
-
-    Chosen on the training split only: choosing on the test set would make the test score of
-    the chosen model optimistic.
-    """
+    """Model with the highest mean cross-validation `metric` (never chosen on the test set)."""
     best = max(cv, key=lambda name: cv[name]["mean"][metric])
     print(f"best model: {best} (CV {metric} = {cv[best]['mean'][metric]:.4f})")
     return best

@@ -1,14 +1,7 @@
-"""Occlusion implemented from scratch: the XAI method we re-implement and compare with Captum.
+"""Occlusion implemented from scratch (Zeiler & Fergus 2014), compared with Captum's.
 
-Algorithm (Zeiler & Fergus, 2014):
-    1. compute the score (logit) of the target class on the original image;
-    2. slide a window over the image and replace the pixels under it with a baseline value
-       (black, the X-ray background);
-    3. the drop of the target score is the importance of the occluded pixels;
-    4. each pixel receives the average drop over all the windows that covered it.
-
-Captum's `Occlusion` follows the same steps (same window grid, same averaging), so the two
-maps should agree up to floating-point error. `compare` measures exactly that.
+Slide a black window over the image; the drop of the class score is the importance of the covered
+pixels; each pixel gets the mean drop of the windows that cover it.
 """
 
 import math

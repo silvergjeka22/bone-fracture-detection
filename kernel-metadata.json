@@ -1,7 +1,6 @@
 {
-  "id": "sevastianguzun/bone-fracture-detection",
   "title": "bone-fracture-detection",
-  "code_file": "notebooks/main.ipynb",
+  "code_file": "main.ipynb",
   "language": "python",
   "kernel_type": "notebook",
   "is_private": true,

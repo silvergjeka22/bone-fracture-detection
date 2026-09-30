@@ -1,17 +1,6 @@
-"""The detector of the full pipeline: YOLOv8 trained on the radiologists' fracture boxes (after Linda, 2025).
+"""YOLOv8 (Ultralytics) trained on the radiologists' fracture boxes: the detector of the pipeline.
 
-The classifiers never see a box; YOLO learns the boxes directly. In the pipeline it says WHERE the
-fracture is, and it is the reference for the XAI boxes: does the classifier look where a detector
-trained on boxes looks?
-
-    write_yolo_dataset   our train / val / test split in YOLO's folder format: the fractured X-rays at
-                         their original resolution + their boxes (like the FracAtlas paper's own
-                         YOLOv8s baseline, mAP@0.5 = 0.562 on its split)
-    train / load         Ultralytics YOLOv8, best weights saved as <out_dir>/best.pt
-    box_metrics          mAP@0.5, mAP@0.5:0.95, precision, recall on the fractured test X-rays
-    find_boxes           boxes (x0, y0, x1, y1, confidence) in pixels of our S x S images
-
-Ultralytics is imported inside the functions, so the rest of the project does not need it.
+ultralytics is imported inside the functions, so the rest of the project does not need it.
 """
 
 import shutil
@@ -23,10 +12,7 @@ CLASS_NAME = "fracture"
 
 
 def write_yolo_dataset(sets, out_dir):
-    """Copy the fractured X-rays of every split with their boxes in YOLO format; returns data.yaml.
-
-    out_dir/images/<split>/<file>, out_dir/labels/<split>/<stem>.txt ("0 cx cy w h", normalised).
-    """
+    """Copy the fractured X-rays of every split with their boxes in YOLO format; returns data.yaml."""
     out_dir = Path(out_dir).resolve()
     shutil.rmtree(out_dir, ignore_errors=True)
     for split, image_set in sets.items():
@@ -81,8 +67,7 @@ def box_metrics(weights, data_yaml, imgsz=640, split="test"):
 
 
 def to_boxes(xyxyn, confidence, size):
-    """YOLO's normalised (k, 4) boxes + (k,) confidences -> (k, 5) array in pixels of the size x size image,
-    most confident first. Normalised coordinates survive our (non-uniform) resize to size x size."""
+    """YOLO's normalised boxes + confidences -> (k, 5) array in pixels of our size x size image, most confident first."""
     xyxyn, confidence = np.asarray(xyxyn, dtype=float).reshape(-1, 4), np.asarray(confidence, dtype=float)
     order = np.argsort(-confidence, kind="stable")
     return np.column_stack([xyxyn[order] * size, confidence[order]]).astype(np.float32)

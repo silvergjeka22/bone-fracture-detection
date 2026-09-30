@@ -1,21 +1,6 @@
-"""Six XAI methods (Captum) applied to every model, our Occlusion, and how to compare attributions.
+"""Six XAI methods (Captum), the deletion test (faithfulness) and the agreement between methods.
 
-    method                family              what it needs from the model        ScatNet
-    Saliency              gradient            gradients                           yes
-    Integrated Gradients  gradient (path)     gradients + a baseline image        yes
-    Guided Backprop       modified gradient   ReLU layers                         only in the classifier
-    Grad-CAM              class activation    a LEARNED convolutional feature map NO (fixed wavelets)
-    Occlusion             perturbation        forward passes only                 yes
-    LIME                  local surrogate     forward passes only                 yes
-
-Every method returns one (H, W) map for the target class, larger = more evidence for that class:
-Saliency and Guided Backprop give gradient magnitudes, Grad-CAM is >= 0, Integrated Gradients,
-Occlusion and LIME are signed (negative = evidence against the class). A method that does not
-apply to a model returns None (stored as a NaN map).
-
-"Removed" pixels (baselines of Integrated Gradients, Occlusion, LIME and of the deletion test)
-are set to black, the X-ray background: a grey patch on a black background would be an
-unrealistic image and move the score for the wrong reason.
+Every method returns one (H, W) map for the target class; None = not applicable (Grad-CAM on ScatNet).
 """
 
 import time
@@ -122,10 +107,7 @@ def applicability(models):
 
 
 def explain_all(model, images, targets, methods=None, cache=None, recompute=False, **params):
-    """Maps of every method for every image: ({method: (N, H, W)}, {method: seconds per image}).
-
-    If `cache` (.npz) exists the maps are loaded instead of recomputed (unless recompute=True).
-    """
+    """Maps of every method for every image and seconds per image; cached as .npz in `cache`."""
     methods = METHODS if methods is None else methods
     params = {**DEFAULT_PARAMS, **params}
     if cache is not None and Path(cache).exists() and not recompute:
@@ -160,11 +142,7 @@ def available(maps):
 
 @torch.no_grad()
 def deletion_curve(model, x, target, attribution, patch=16, steps=20, baseline=BLACK):
-    """Probability of the target class while the patches are blacked out, most important first.
-
-    A faithful map puts the patches the model really uses first, so the probability drops fast:
-    the smaller the area under this curve, the better the attribution.
-    """
+    """Probability of the target class while the patches are blacked out, most important first."""
     _, _, height, width = x.shape
     gh, gw = height // patch, width // patch
     scores = attribution[:gh * patch, :gw * patch].reshape(gh, patch, gw, patch).mean((1, 3)).ravel()
@@ -206,11 +184,7 @@ def deletion_table(curves):
 
 
 def agreement_matrix(maps, patch=16):
-    """Spearman rank correlation between methods, averaged over images.
-
-    Maps are compared as |attribution| averaged over patch x patch regions, so that pixel-level
-    methods (gradients) and region-level methods (LIME, Occlusion, Grad-CAM) are on equal footing.
-    """
+    """Spearman rank correlation between methods, averaged over images."""
     def pooled(a):  # (N, H, W) -> (N, regions)
         n, h, w = a.shape
         a = a[:, :h // patch * patch, :w // patch * patch]

@@ -1,12 +1,4 @@
-"""Export the results for the report and the presentation.
-
-    results/summary.json          every number of the experiment in one file
-    results/latex/numbers.tex     \\newcommand macros (e.g. \\TestAccCNN) used in the slides
-    results/latex/<table>.tex     booktabs tables, \\input by the slides
-
-The presentation (presentation/main.tex) reads these files, so after a new run the slides are
-rebuilt with `make -C presentation` and never contain a number typed by hand.
-"""
+"""Export the results: results/summary.json and the LaTeX numbers and tables used by the slides."""
 
 import json
 import re
@@ -23,14 +15,7 @@ MODEL_LABELS = {"cnn": "CNN", "scatnet": "ScatNet", "resnet18": "ResNet18"}
 
 def build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar, xai_results, settings,
                   localization=None, pipeline=None):
-    """All results in one JSON-friendly dict.
-
-    xai_results: {model: {"deletion": DataFrame, "seconds": {method: s}}} plus optionally
-    "scratch_vs_captum": DataFrame (one row per model).
-    localization: {model: DataFrame from localize.localization_table}.
-    pipeline: {"detector": detect.box_metrics, "detector_boxes": localize.score_boxes, "cases": pipeline.scores,
-               "box_method": XAI method used by the pipeline} (dicts of numbers).
-    """
+    """All results in one JSON-friendly dict."""
     summary = {
         "settings": settings,
         "dataset": json.loads(data_table.to_json(orient="index")),

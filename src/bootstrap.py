@@ -1,12 +1,4 @@
-"""Environment setup, called once at the top of the notebook: Kaggle, Colab or a local machine.
-
-On Kaggle (see kernel-metadata.json and run.sh):
-  - the dataset is attached as an input and mounted read-only under /kaggle/input;
-  - /kaggle/working is the only folder saved as the kernel's output, so results go there
-    (/kaggle/working/results) and the image cache goes to /tmp (it is rebuilt in ~1 minute
-    and would only bloat the download);
-  - torch, numpy, sklearn, matplotlib are preinstalled: only kymatio, captum and ultralytics (YOLO) are added.
-"""
+"""Setup for Kaggle or a local machine: install missing packages, find the dataset, make the output folders."""
 
 import importlib.util
 import os
@@ -19,11 +11,7 @@ PACKAGES = {"kymatio": "kymatio>=0.3", "captum": "captum>=0.7", "ultralytics": "
 
 
 def environment():
-    if "KAGGLE_KERNEL_RUN_TYPE" in os.environ or Path("/kaggle/input").is_dir():
-        return "kaggle"
-    if "google.colab" in sys.modules:
-        return "colab"
-    return "local"
+    return "kaggle" if "KAGGLE_KERNEL_RUN_TYPE" in os.environ or Path("/kaggle/input").is_dir() else "local"
 
 
 def install():
@@ -35,12 +23,7 @@ def install():
 
 
 def setup(root=REPO_ROOT, data_dir=None, install_deps=True):
-    """Install missing packages, find the dataset and create the output folders.
-
-    Returns {"env", "root", "data", "results", "figures", "cache"} (paths as pathlib.Path).
-    `data_dir` overrides the automatic search (Kaggle: /kaggle/input; elsewhere: <repo>/data);
-    the environment variables BFD_DATA_DIR and BFD_RESULTS_DIR do the same without editing the notebook.
-    """
+    """Install missing packages, find the dataset and create the output folders."""
     env = environment()
     root = Path(root)
     if install_deps:
@@ -48,12 +31,8 @@ def setup(root=REPO_ROOT, data_dir=None, install_deps=True):
 
     from .data import find_data_dir  # imported after install(): data.py needs torch/torchvision
 
-    data_dir = data_dir or os.environ.get("BFD_DATA_DIR")
-    if data_dir is None:
-        search = Path("/kaggle/input") if env == "kaggle" else root / "data"
-        data_dir = find_data_dir(search)
-    else:
-        data_dir = find_data_dir(data_dir)
+    default = Path("/kaggle/input") if env == "kaggle" else root / "data"
+    data_dir = find_data_dir(data_dir or os.environ.get("BFD_DATA_DIR") or default)
     if env == "kaggle":
         results, cache = Path("/kaggle/working/results"), Path("/tmp/bfd-cache")
     else:

@@ -23,8 +23,7 @@ data/
 cache/
 out/
 .kaggle-build/
-kaggle_remember_setup.txt
-Bone_Fracture_Binary_Classification/
+.kaggle-kernel
 
 # Trained weights and cached attribution maps (large; they come back with ./run.sh get)
 results/models/

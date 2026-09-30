@@ -2,247 +2,130 @@
 
 MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
-Binary classification of X-rays (**fractured** / **not fractured**) on **FracAtlas**, where radiologists
-drew a box around every fracture. A CNN trained from scratch and a wavelet Scattering Network (ScatNet,
-Kymatio) are compared, with an ImageNet-pretrained ResNet18 as a reference; all three end with **the same
-classifier**. The best model is chosen by cross-validation, tested once, its filters are compared with
-ScatNet's wavelets, and the models are explained with **six XAI methods** (Captum), one of which
-(Occlusion) is also implemented from scratch. Every explanation is turned into a **fracture box** and
-checked against the radiologists' boxes: do the models look at the fracture? Finally a **full pipeline**
-after Linda (2025) combines the best classifier, a **YOLOv8 detector** trained on the boxes and the best
-XAI method into a verdict and a short report per X-ray.
+X-rays of **FracAtlas** (fractured / not fractured, with the radiologists' fracture boxes). A CNN, a wavelet
+ScatNet and a pretrained ResNet18, all ending with **the same classifier**, are compared and explained with
+**six XAI methods** (Occlusion also written from scratch). The explanations become **fracture boxes**,
+checked against the radiologists' boxes, and a **full pipeline** after Linda (2025) combines the best
+classifier, a **YOLOv8** detector and the best XAI method into a short report per X-ray.
 
-Everything runs from one notebook, `notebooks/main.ipynb`, on a **Kaggle GPU** (`./run.sh push`).
+## Run it on Kaggle (macOS and Windows)
 
-## Exam requirements -> where
+### Once, on each computer
 
-| requirement (exam PDF) | where |
+1. **Python 3.9+** and the Kaggle tool: `python -m pip install kaggle`
+2. A **phone-verified** Kaggle account (needed for the GPU and internet).
+3. A **Kaggle API token**: kaggle.com > Settings > API > *Create New Token*. Put the downloaded `kaggle.json` in
+   - macOS / Linux: `~/.kaggle/kaggle.json`
+   - Windows: `C:\Users\<you>\.kaggle\kaggle.json`
+
+   The notebook runs on **this** account. Check which one with `kaggle config view` (the username line).
+
+### Every run
+
+| | macOS, Linux, Windows Git Bash | Windows PowerShell or cmd |
+|---|---|---|
+| quick check (~5 min) | `./run.sh push --quick` | `run.bat push --quick` |
+| full run (~2-3 h on a T4) | `./run.sh push` | `run.bat push` |
+| is it done? | `./run.sh status` | `run.bat status` |
+| download the results | `./run.sh get` | `run.bat get` |
+
+- `push` packs `src/` into the notebook and starts it at `kaggle.com/code/<your-username>/bone-fracture-detection`.
+  When it prints *Kaggle accepted the job*, the computer can be switched off.
+- `get` downloads everything into `out/run-<time>/` and, if the run is complete, copies `results/` into `./results`.
+- Do the quick check first; start the full run only when it ends with status *complete*.
+
+### If something goes wrong
+
+| message | fix |
 |---|---|
-| binary dataset, train/test split | FracAtlas (Kaggle `mahmudulhasantasin/fracatlas-original-dataset`); notebook §1, `src/data.py` |
-| CNN + ScatNet, same classifier except input size | `src/models.py` (`Classifier`), notebook §2 (asserted) |
-| k-fold CV: mean accuracy + mean F1 on the training set | `training.cross_validate`, notebook §3 |
-| filters extracted and compared | notebook §6: `filters_cnn`, `filters_scatnet`, `frequency_coverage` |
-| test set, >= 75% accuracy | notebook §4, `training.evaluate_test` |
-| six XAI methods on CNN and ScatNet | `src/xai.py`: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM, Occlusion, LIME |
-| one method from scratch vs Captum | `src/occlusion_scratch.py`, notebook §8 |
-| attributions overlaid, 2 images per class, both models | notebook §7 (`xai_cnn`, `xai_scatnet`) |
-| quality of the attributions, methods that cannot be used | notebook §9 (deletion test, agreement), §10 (boxes), §12 |
-| learning curves train + val in one figure | `learning_curves.png` |
-| (extra) full pipeline after Linda (2025): classifier + YOLOv8 + XAI -> report | `src/detect.py`, `src/pipeline.py`, notebook §11 |
-| presentation | `presentation/main.pdf` (built from `results/`), `presentation/SPEAKER_NOTES.md` |
+| *Kaggle login failed* | put a fresh `kaggle.json` in the `.kaggle` folder (step 3) |
+| *Kaggle refused the request* (403) | the account is not phone-verified, or `--user` is not the logged-in account |
+| *Kaggle username not found* | `./run.sh push --user <your-kaggle-username>` |
+| status *error* | `./run.sh get`, then read the `.log` file in `out/run-<time>/` |
+| *Python 3.9+ not found* | install Python (python.org) or activate your conda environment |
 
-`python .claude/skills/exam-checklist/scripts/check_exam.py` checks all of this on a finished run.
+Two Kaggle accounts on one computer: the one used is the `kaggle.json` in the `.kaggle` folder.
 
-## Results
+## Results and slides
 
-The numbers are produced by the Kaggle run and written to `results/summary.json`
-(`report.key_findings` prints them at the end of the notebook). They are not typed anywhere by hand:
-the slides read `results/latex/`. After `./run.sh get`, the full table is in `results/latex/test.tex`
-and in the notebook's §4-§5.
+`results/summary.json` holds every number, `results/figures/` every figure, `results/latex/` the numbers of the
+slides. `make -C presentation` (or `./run.sh slides`) rebuilds `presentation/main.pdf` from them;
+`presentation/SPEAKER_NOTES.md` has the timing (about 11:30 of the 12 minutes).
 
-## Project layout
-
-```
-bone-fracture-detection/
-├── notebooks/main.ipynb      the whole experiment: settings + calls to src (no function definitions)
-├── src/
-│   ├── bootstrap.py          Kaggle / Colab / local setup: packages, dataset path, output folders
-│   ├── data.py               load + cache FracAtlas (X-rays + fracture boxes), near-duplicates, grouped split, loaders
-│   ├── models.py             BoneFractureCNN, ScatNet, ResNet18, one shared Classifier
-│   ├── training.py           grouped k-fold CV, final training, test metrics, bootstrap CI, McNemar
-│   ├── xai.py                six XAI methods, applicability, deletion test, agreement, scratch vs Captum
-│   ├── occlusion_scratch.py  Occlusion implemented from scratch
-│   ├── localize.py           XAI heatmap -> fracture box; hit rate and IoU against the radiologists' boxes
-│   ├── detect.py             YOLOv8 (Ultralytics) trained on the fracture boxes: train, mAP, predicted boxes
-│   ├── pipeline.py           classifier + YOLO + explanation -> verdict and report per X-ray
-│   ├── plots.py              every figure (fixed colours per model / class / method)
-│   ├── report.py             summary.json + LaTeX macros/tables for the slides
-│   └── utils.py              seed, device, parameter count, Kymatio/SciPy fix
-├── tests/                    pytest: unit tests + the notebook run end to end on synthetic X-rays
-├── presentation/             beamer slides (main.tex -> main.pdf), speaker notes
-├── results/                  written by the notebook: summary.json, cv/, final/, figures/, latex/
-│                             (models/ and attributions/ are large and gitignored)
-├── docs/previous_run/        CV logs of the first iteration (before the fixes listed below)
-├── kernel-metadata.json      Kaggle kernel: GPU, internet, dataset attached
-├── run.sh                    Windows/Linux shell entry point
-├── scripts/kaggle_run.py     private code snapshot + push / status / get
-└── .claude/skills/           kaggle-run, exam-checklist, presentation, ml-project-structure
-```
-
-## Run it on Kaggle (recommended)
-
-Same pattern as `macura-drone`: the job runs on a Kaggle GPU, launched from your terminal; you can
-switch the PC off and download the results later.
-
-**One-time setup**
-1. Activate the environment and install the local dependencies:
-   ```bash
-   conda activate bone-fracture
-   python -m pip install -r requirements.txt
-   ```
-2. Make sure the Kaggle account is phone-verified, then authenticate the CLI. OAuth is recommended
-   because it requests the permissions needed to create private Datasets and update Notebooks. If a
-   legacy key exists, move it aside first because it can take precedence over OAuth:
-   ```bash
-   mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup
-   kaggle auth login --force
-   ```
-   Sign in with the same Kaggle account named in `kernel-metadata.json` and accept the requested
-   permissions. If no browser opens, use
-   `kaggle auth login --force --no-launch-browser` and open the displayed URL manually.
-3. Put your Kaggle username in `kernel-metadata.json` (`"id": "<username>/bone-fracture-detection"`).
-
-Do not put Kaggle keys or GitHub tokens in this repository. To restore the old legacy Kaggle key if
-needed, run `mv ~/.kaggle/kaggle.json.backup ~/.kaggle/kaggle.json`.
-
-### Setup for collaborators
-
-After pulling the repository, each collaborator uses their own Kaggle account and credentials.
-Change only the `id` line in `kernel-metadata.json`:
-
-```json
-"id": "COLLABORATOR_KAGGLE_USERNAME/bone-fracture-detection"
-```
-
-Then authenticate locally with that same account:
+## Run locally (optional)
 
 ```bash
-conda activate bone-fracture
 python -m pip install -r requirements.txt
-mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup  # only if the legacy file exists
-kaggle auth login --force
-./run.sh push --quick
-```
-
-No GitHub token is needed on Kaggle. Do not copy or commit another person's `kaggle.json`, access
-token, OAuth credentials, or `kaggle_remember_setup.txt`. The launcher tests derive the expected
-owner from `kernel-metadata.json`, so they do not require a username edit.
-
-GitHub authentication is needed only for `git clone` / `git pull` on your computer. The remote
-kernel never receives a GitHub token: `run.sh` uploads an allowlisted snapshot of `src/*.py` and
-`requirements.txt` as an immutable **private Kaggle Dataset**, then attaches it to the notebook.
-Identical source snapshots reuse that dataset. A changed snapshot creates one small private dataset
-that can later be removed from Kaggle when its reproducibility record is no longer needed.
-
-`kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` with `machine_shape: NvidiaTeslaT4`
-(recent PyTorch builds no longer support the older P100), `enable_internet` true (pip install
-kymatio/captum + ResNet18 weights), `dataset_sources` =
-`mahmudulhasantasin/fracatlas-original-dataset` (FracAtlas, mounted read-only under `/kaggle/input`).
-The launcher adds the private code snapshot to `dataset_sources` only in its staged metadata.
-
-**Run**
-```bash
-conda activate bone-fracture
-cd ~/Desktop/bone-fracture-detection
-
-./run.sh push --quick --dry-run  # inspect the staged files locally; no Kaggle connection
-./run.sh push --quick     # 5-minute health check on a small subset (do it once)
-./run.sh status           # queued / running / complete / error
-./run.sh push             # the full run, ~2-3 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI + YOLO)
-./run.sh get              # download into ./out and copy the results into ./results
-./run.sh slides           # rebuild presentation/main.pdf with the new numbers
-./run.sh stop             # print the Kaggle page where a running session can be stopped
-./run.sh                  # show launcher help
-```
-The launcher uploads the files from the currently checked-out local branch, including uncommitted
-source edits. It records the branch, commit and snapshot checksum in the staged notebook metadata.
-After Kaggle accepts the job, it runs independently and the PC can be switched off. Each download is
-kept in a separate `out/run-<timestamp>/` folder so a failed run cannot erase an earlier result.
-Outputs (in `/kaggle/working/results` on the kernel): `summary.json`, `cv/`, `final/`, `figures/`,
-`latex/`, `models/*.pth`, `attributions/*.npz`, `detector/best.pt` (YOLO).
-
-Recommended order: run `push --quick`, monitor with `status`, and download with `get`. If that
-health check succeeds, start the full run with `push`. Wait for `Kaggle accepted the job; the PC can
-now be switched off.` before closing the terminal or turning off the computer.
-
-If Dataset creation ends with `403 Forbidden` after the file upload reaches 100%, the file transfer
-succeeded but Kaggle rejected creation of the Dataset. Repeat the OAuth setup above and accept the
-Dataset/Notebook permissions; do not add a token to the notebook or repository.
-
-## Run it locally
-
-```bash
-pip install -r requirements.txt
-# dataset: download FracAtlas and unzip it into data/ (any depth: the folder with images/Fractured is found)
+# unzip FracAtlas into data/ (the folder with images/Fractured is found at any depth)
 jupyter notebook notebooks/main.ipynb
 ```
-Only the **Settings** cell needs editing (`QUICK`, `TRAIN`, `MODELS`, `EPOCHS`, ...). With `TRAIN = False`
-the notebook reloads `results/models/*.pth`, `results/detector/best.pt` and the JSON logs of a previous run and only redraws.
-Environment variables `BFD_DATA_DIR` / `BFD_RESULTS_DIR` override the paths without editing the notebook.
+
+Only the **Settings** cell is edited (`QUICK`, `TRAIN`, `EPOCHS`, ...). `TRAIN = False` reloads the weights of a
+previous run (`results/models/`, `results/detector/`) and only redraws.
 
 ## Tests
 
 ```bash
-pytest -m "not slow"   # ~2-5 min on a CPU: data, duplicates, models, training, every XAI method, report
-pytest -m slow         # the whole notebook on synthetic X-rays (tests/synthetic.py), QUICK mode
+pytest -m "not slow"   # a few minutes on a CPU, synthetic X-rays
+pytest -m slow         # the whole notebook on synthetic X-rays (needs ultralytics)
 ```
-What they prove without the real data: identical classifiers; every method runs on every model and
-Grad-CAM is refused on ScatNet; our Occlusion equals Captum's (to 1e-5); Integrated Gradients
-satisfies completeness; the deletion test ranks the correct map first; YOLO label files are read and written
-correctly and YOLO's output becomes boxes in our pixels (with a fake `ultralytics`); the pipeline's verdicts
-and reports;
-a map that is hot on a (synthetic) fracture gives a box on it; the split and the folds never separate a
-duplicate group; planted flipped/rotated/brightened copies are found; a model overfits 16 images;
-the notebook runs top to bottom. CI runs both on every push (`.github/workflows/tests.yml`).
 
-## Design choices (and why)
+## Project layout
 
-- **Grey input, 1 channel**: X-rays are grey; 3 identical channels only triple ScatNet's coefficients.
-- **CNN**: 4 conv blocks 32 -> 256 with BN and max-pool; the **first layer is 7x7** so that its filters
-  show a shape that can be compared with the wavelets.
-- **ScatNet**: Kymatio `Scattering2D(J=4, L=8)`, second order: 417 maps on the same 14x14 grid as the
-  CNN; coefficients log-compressed and batch-normalised (their magnitudes span orders).
-- **Same classifier** `flatten -> 512 -> 128 -> 2` (ReLU, dropout 0.5) for every model.
-- **FracAtlas**: the only public fracture dataset of this size with fracture boxes drawn by radiologists,
-  so the explanations can be checked, not only looked at. It has no official split: we make a stratified
-  ~70/15/15 split.
-- **Near-duplicates**: copies of the same X-ray (resized, flipped, brighter) are found first, and the
-  split and the cross-validation folds are **grouped**: copies never end up on both sides.
-- **Unbalanced classes**: 1 X-ray in 6 is fractured, so the cross-entropy weights each class by its
-  inverse frequency, the best model is chosen by F1 of the fractured class, and recall and AUC are
-  reported next to accuracy (always answering "not fractured" would already give ~82%).
-- **Honest CV**: fold scores at the last epoch (nothing selected on the validation fold); the best model
-  is chosen on CV (`SELECT_BY = "f1"`), never on the test set; the test set is used once, with a
-  bootstrap 95% interval and McNemar tests between models.
-- **Final models** trained on the whole training split; the separate `val` split picks the epoch.
-- **XAI**: six methods from four families, so the discussion can compare them and show that
-  **Grad-CAM cannot be applied to ScatNet** (no learned conv feature map) and **Guided Backprop only
-  partly** (the scattering non-linearity is a modulus, not a ReLU). "Removed" pixels are **black**
-  (the X-ray background): a grey baseline made the first version highlight the background.
-- **Quality of the attributions** is measured, not only looked at: deletion test (faithfulness) and
-  Spearman agreement between methods.
-- **Fracture boxes** (`src/localize.py`): each map is smoothed, the pixels above half of the strongest
-  evidence are kept, and the box goes around the connected area with the most evidence. Scores on the
-  fractured test X-rays: **hit rate** (pointing game: hottest point inside a radiologist's box, against a
-  random point) and **IoU** of the boxes. The figures keep the evidence outside the box visible (faint),
-  so a model that also looks at a label or a metal plate is not hidden.
-- **Full pipeline** (after Linda, 2025; `src/detect.py`, `src/pipeline.py`): **YOLOv8s** (COCO-pretrained, as
-  in the FracAtlas paper's baseline, mAP@0.5 = 0.562) is fine-tuned on the fractured X-rays of our training
-  split. For every test X-ray the best classifier decides, YOLO gives the box, the best XAI method (most hits
-  among the methods more faithful than Random) explains, and the verdict is *fracture* / *no fracture* when
-  classifier and detector agree, *needs review* when they disagree. From the paper we leave out the CT scans
-  (FracAtlas has X-rays only) and the graph network (no evidence it helps). YOLO is also scored like the XAI
-  boxes: the level a detector trained *with* boxes reaches.
+```
+notebooks/main.ipynb   the experiment: settings + calls to src/
+src/
+  bootstrap.py         Kaggle or local setup
+  data.py              FracAtlas, fracture boxes, near-duplicates, split, loaders
+  models.py            CNN, ScatNet, ResNet18, one shared Classifier
+  training.py          grouped k-fold CV, final training, test metrics
+  xai.py               six XAI methods, deletion test, agreement
+  occlusion_scratch.py Occlusion from scratch
+  localize.py          heatmap -> fracture box, hit rate and IoU
+  detect.py            YOLOv8 on the fracture boxes
+  pipeline.py          classifier + YOLO + XAI -> verdict and report
+  plots.py, report.py  figures, summary.json and the numbers of the slides
+tests/                 pytest (synthetic X-rays)
+presentation/          slides (main.tex -> main.pdf) and speaker notes
+run.sh, run.bat        Kaggle launcher (scripts/kaggle_run.py)
+kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
+```
 
-## Previous iteration and what changed
+## Method in short
 
-The first version (branch `xai`, team notebook) used the Kaggle *Bone Fracture Multi-Region X-ray
-Data* and reached CV 97.4 / 98.3 / 96.7% and test 92.9 / 94.7 / 90.5% for CNN / ResNet18 / ScatNet
-(logs in `docs/previous_run/`; not comparable with FracAtlas). It had: different classifiers for
-CNN and ScatNet, CV folds mixing copies of an X-ray and scored at the best epoch (4-6 points CV/test
-gap), RGB input, a grey Occlusion baseline, F1 computed for the wrong class, no Kaggle setup, and a
-dataset without fracture locations, so the explanations could not be checked. All fixed here. The old notebooks and attribution files are in the history of branch `xai`.
+- **Data**: FracAtlas (4,083 X-rays, 717 fractured). Grey, 224x224. Copies of the same X-ray are found first,
+  so the stratified ~70/15/15 split and the k folds never separate them. 1 in 6 is fractured: weighted loss.
+- **Models**: CNN (first layer 7x7), ScatNet (Kymatio, J=4, L=8), ResNet18; same classifier
+  `flatten -> 512 -> 128 -> 2`. Best model by cross-validation F1, test set used once.
+- **XAI**: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM (not on ScatNet), Occlusion, LIME;
+  black = "removed". Quality: deletion test and hit rate against the radiologists' boxes.
+- **Pipeline** (Linda 2025, without CT and the graph network): YOLOv8s gives the box, the best classifier
+  decides, the best XAI method explains; if classifier and YOLO disagree, the X-ray *needs review*.
 
-> **Security**: a Kaggle API key was committed in an old notebook (branch `xai` history). Revoke it
-> on kaggle.com (Settings -> API -> Expire token) if not done yet.
+## Exam requirements -> where
+
+| requirement | where |
+|---|---|
+| CNN + ScatNet, same classifier | `src/models.py`, notebook §2 |
+| k-fold CV, mean accuracy + F1 | `training.cross_validate`, §3 |
+| test set, >= 75% accuracy | `training.evaluate_test`, §4 |
+| filters compared | §6 |
+| six XAI methods, 2 images per class | `src/xai.py`, §7 |
+| one method from scratch vs Captum | `src/occlusion_scratch.py`, §8 |
+| quality of the explanations, discussion | §9, §10, §13 |
+
+`python .claude/skills/exam-checklist/scripts/check_exam.py` checks a finished run.
+
+## Previous version
+
+The first version used the Kaggle *Bone Fracture Multi-Region* dataset: 98.6% of its test X-rays had a copy in
+the training set, so its 95-99% test accuracy mostly measured memory, and it had no fracture boxes. Its logs are
+in `docs/previous_run/`. (An old Kaggle key is in the history of branch `xai`: revoke it on kaggle.com.)
 
 ## References
 
-Bruna & Mallat 2013 (scattering networks) · Simonyan et al. 2014 (saliency) · Springenberg et al.
-2015 (guided backprop) · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan
-et al. 2017 (integrated gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion /
-region perturbation) · Zhang et al. 2018 (pointing game) · Linda 2025 (graph-augmented multi-modal fracture
-detection and reporting, *J. Electrical Systems* 21) · Ultralytics YOLOv8 · Abedeen et al. 2023 (FracAtlas, *Scientific
-Data*) · Captum (captum.ai) · Kymatio (kymat.io).
-
-Course instructors: Prof. Gloria Menegaz, Giorgio Dolci.
+Bruna & Mallat 2013 (scattering) · Simonyan et al. 2014 (saliency) · Springenberg et al. 2015 (guided backprop)
+· Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan et al. 2017 (integrated
+gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion test) · Zhang et al. 2018 (pointing
+game) · Abedeen et al. 2023 (FracAtlas, *Scientific Data*) · Linda 2025 (fracture detection and reporting,
+*J. Electrical Systems*) · Captum · Kymatio · Ultralytics YOLOv8.

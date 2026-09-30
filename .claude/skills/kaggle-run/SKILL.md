@@ -1,61 +1,40 @@
 ---
 name: kaggle-run
-description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU kernel and bring the results back - privately upload an allowlisted local source snapshot with run.sh, check status, download output into results/, rebuild slides, and debug failed Kaggle runs (dataset not found, wrong source snapshot, kymatio/scipy error, missing ResNet18 weights, 12-hour limit). Use it whenever the user wants to train, re-run, get results, "run it on Kaggle", check a Kaggle run, or asks why the Kaggle kernel failed, even if they don't say "skill".
+description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU and bring the results back with ./run.sh (macOS, Linux, Git Bash) or run.bat (Windows) - push, quick check, status, download into results/, rebuild slides, and debug failed Kaggle runs (login, 403, dataset not found, kymatio/scipy error, missing weights, 12-hour limit). Use it whenever the user wants to train, re-run, get results, "run it on Kaggle", check a Kaggle run, or asks why the Kaggle kernel failed, even if they don't say "skill".
 ---
 
 # Run the experiment on Kaggle
 
-The notebook is designed to run top to bottom on a Kaggle GPU kernel, launched from a terminal
-(the pattern of the `macura-drone` project): `kernel-metadata.json` describes the kernel, `run.sh`
-wraps the Kaggle CLI, `src/bootstrap.py` prepares the kernel.
+`run.sh` / `run.bat` call `scripts/kaggle_run.py`, which uses the `kaggle` command-line tool
+(works with kaggle 1.7 on Python 3.9 and kaggle 2.x on 3.11+).
 
-## How the pieces fit
-
-| file | role |
-|---|---|
-| `kernel-metadata.json` | kernel id (`<kaggle-user>/bone-fracture-detection`), GPU (T4) + internet on, **dataset attached**: `mahmudulhasantasin/fracatlas-original-dataset` (FracAtlas) |
-| `run.sh` | Git Bash / POSIX entry point for `scripts/kaggle_run.py` |
-| `scripts/kaggle_run.py` | allowlists local source, creates/reuses an immutable private code Dataset, attaches it and starts the job |
-| notebook cell 1 | verifies and reconstructs the attached code snapshot under `/tmp`; no GitHub credentials |
-| `src/bootstrap.setup()` | pip-installs kymatio + captum only, finds the dataset under `/kaggle/input`, results -> `/kaggle/working/results` (the kernel output), image cache -> `/tmp` |
-
-`run.sh push` never edits the repo notebook. It stages a copy with the code checksum and `QUICK`
-filled in, attaches only the required local source files, and refuses credential-like content.
+- `push [--quick] [--user NAME]`: packs `src/*.py` + `requirements.txt` into the first cell of the notebook
+  (base64 zip, unpacked to `/tmp/bfd`), writes `.kaggle-build/` and runs `kaggle kernels push`. The kernel is
+  `<logged-in username>/bone-fracture-detection`; settings (T4, internet, FracAtlas) from `kernel-metadata.json`.
+  `--dry-run` only prepares `.kaggle-build/`.
+- `status`, `get`: `kaggle kernels status / output` of the last pushed kernel (`.kaggle-kernel`); `get` saves
+  into `out/run-<time>/` and copies `results/` into `./results` only if the run is complete.
 
 ## Workflow
 
-1. One-time: activate `bone-fracture`, install `requirements.txt`, move a legacy
-   `~/.kaggle/kaggle.json` to `.backup` (legacy credentials can override OAuth), then run
-   `kaggle auth login --force`, sign in to the account named in `kernel-metadata.json`, and accept
-   the requested Dataset/Notebook permissions. Use `--no-launch-browser` when necessary.
-2. Optional offline preview: `./run.sh push --quick --dry-run` (no authentication or upload).
-3. Health check (~5 min): `./run.sh push --quick` -> `./run.sh status` until `complete` -> `./run.sh get`.
-4. Full run (~2-3 h on a T4, 12 h is the limit): `./run.sh push`. Once accepted, the PC can be switched off.
-5. `./run.sh get` downloads to a new timestamped folder in `./out` and copies completed `results` into `./results`
-   (`summary.json`, `cv/`, `final/`, `figures/`, `latex/`, `models/*.pth`, `attributions/*.npz`, `detector/best.pt`).
-6. `./run.sh slides` rebuilds `presentation/main.pdf` with the new numbers.
-7. Commit `results/` **without** `models/` and `attributions/` (gitignored, too large), plus the new PDF.
-8. Run the exam checklist skill (`python .claude/skills/exam-checklist/scripts/check_exam.py`).
+1. `./run.sh push --quick`, then `./run.sh status` until complete, then `./run.sh get`.
+2. `./run.sh push` (full run, ~2-3 h), later `./run.sh get`.
+3. `./run.sh slides`, commit `results/` (models, attributions, detector are gitignored), run the exam checklist.
 
-To re-draw figures without retraining: open the notebook locally (or on Kaggle with the previous
-output attached) with `TRAIN = False`; it reloads `results/models/*.pth`, `results/detector/best.pt` and the JSON logs.
+The sandbox may not reach kaggle.com: then the user runs these commands; say so instead of retrying.
 
 ## Troubleshooting
 
-| symptom | cause / fix |
+| symptom | fix |
 |---|---|
-| `No folder with images/Fractured and images/Non_fractured found under /kaggle/input` | FracAtlas not attached: check `dataset_sources`, or add it in the kernel's "Add data" panel |
-| `No module named 'ultralytics'` / `yolov8s.pt` download fails | internet disabled: `enable_internet: true` (bootstrap pip-installs ultralytics, YOLO downloads its COCO weights) |
-| `No YOLO annotation folder` | the attached copy of FracAtlas lacks `Annotations/YOLO`: attach the original release (`mahmudulhasantasin/fracatlas-original-dataset`) |
-| code Dataset rejected / not private | check the Kaggle username in `kernel-metadata.json`; the launcher never submits a kernel until it confirms privacy |
-| upload reaches 100%, then `403 Forbidden` | Kaggle accepted the temporary blob but denied Dataset creation; move legacy `kaggle.json` aside, run `kaggle auth login --force`, and accept Dataset/Notebook permissions |
-| wrong local branch | switch branches locally first; the launcher uploads the checked-out local files and records their checksum |
-| `cannot import name 'sph_harm'` | SciPy >= 1.17 with Kymatio 0.3: `src/utils.patch_scipy_for_kymatio()` must run before `import kymatio` (models.py and plots.py do it) |
-| ResNet18 weights download fails | internet disabled: `enable_internet: true` |
-| `PyTorch cannot run on Tesla P100` / `no kernel image is available` | recent PyTorch dropped the P100: keep `machine_shape: NvidiaTeslaT4` (or pick T4 in the kernel settings) |
-| CUDA out of memory | lower `BATCH_SIZE` in the Settings cell (ScatNet's classifier has 42M weights) |
-| killed after 12 h, no output | a commit that exceeds the limit saves nothing: lower `EPOCHS`/`K_FOLDS` or drop `resnet18` from `MODELS` |
-| `kaggle: command not found` | `pip install kaggle` on the machine that runs `run.sh` |
-
-The session's own sandbox may block kaggle.com: then the run must be launched by the user from
-their machine; say so instead of retrying.
+| login failed / 401 | new token: kaggle.com > Settings > API > Create New Token, `kaggle.json` in `~/.kaggle/` |
+| 403 | account not phone-verified (GPU / internet), or `--user` differs from the logged-in account |
+| wrong account | the account is the `kaggle.json` in `~/.kaggle/`; `kaggle config view` shows it |
+| `No folder with images/Fractured` | FracAtlas not attached: check `dataset_sources` |
+| `No YOLO annotation folder` | the attached FracAtlas copy lacks `Annotations/YOLO` |
+| `cannot import name 'sph_harm'` | `utils.patch_scipy_for_kymatio()` must run before `import kymatio` |
+| ultralytics / weights download fails | `enable_internet: true` in `kernel-metadata.json` |
+| `no kernel image is available` | keep `machine_shape: NvidiaTeslaT4` (P100 is no longer supported) |
+| CUDA out of memory | lower `BATCH_SIZE` in the Settings cell |
+| killed after 12 h | lower `EPOCHS` / `K_FOLDS` or drop `resnet18` from `MODELS` |
+| a run failed | `./run.sh get` and read the `.log` in `out/run-<time>/` |

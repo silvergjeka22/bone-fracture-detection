@@ -1,18 +1,6 @@
-"""From an XAI heatmap to a fracture box, scored against the boxes drawn by the radiologists.
+"""From an XAI heatmap to a fracture box, scored against the radiologists' boxes.
 
-A heatmap colours the whole X-ray; a box says "the fracture is here", which anyone can check:
-
-    1. keep only the evidence FOR 'fractured' (the positive values) and smooth it a little
-       (gradient maps are noisy pixel by pixel);
-    2. keep the pixels above `threshold` x the strongest evidence;
-    3. the connected blob that holds the most evidence is our fracture: the box goes around it.
-
-Scores over the fractured test X-rays (FracAtlas has a box around every fracture):
-    hit rate      pointing game: the hottest point of the map lies inside a radiologist's box
-    IoU           overlap (intersection / union) of our box with the best-matching radiologist's box
-    box size      area of our box, % of the image (a huge box would contain the fracture by luck)
-'Random' is the reference to beat: the chance that a random point lies inside a radiologist's box.
-The detector of the pipeline (YOLO, trained on the boxes) is scored the same way (`score_boxes`).
+hit rate = the hottest point is inside a radiologist's box (pointing game); IoU = box overlap.
 """
 
 import numpy as np
@@ -79,10 +67,7 @@ def box_area_share(true_boxes, shape):
 
 
 def localization_table(maps, true_boxes, threshold=THRESHOLD, smooth=SMOOTH):
-    """{method: (N, H, W) maps} of N fractured X-rays -> hit rate, mean IoU and mean box size per method.
-
-    Methods that do not apply to the model (NaN maps) are left out; 'Random' is the reference.
-    """
+    """{method: (N, H, W) maps} of N fractured X-rays -> hit rate, mean IoU and mean box size per method."""
     rows = {}
     for method, m in maps.items():
         if np.isnan(m).all():
@@ -102,8 +87,7 @@ def localization_table(maps, true_boxes, threshold=THRESHOLD, smooth=SMOOTH):
 
 
 def score_boxes(boxes, true_boxes, shape):
-    """The same scores for predicted boxes (e.g. YOLO's (k, 5) arrays, most confident first): the centre of
-    the most confident box plays the hottest point; an image without a box is a miss."""
+    """Hit rate, IoU and box size of predicted boxes (the most confident box of each image)."""
     top = [b[0, :4] if len(b) else None for b in boxes]
     hits = [b is not None and _inside((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, t) for b, t in zip(top, true_boxes)]
     area = shape[0] * shape[1]
@@ -114,8 +98,7 @@ def score_boxes(boxes, true_boxes, shape):
 
 
 def choose_method(localization, deletion):
-    """XAI method for the pipeline: the most hits among the methods more faithful than Random in the
-    deletion test (among all methods if none beats Random)."""
+    """XAI method for the pipeline: the most hits among the methods that beat Random in the deletion test."""
     auc = deletion["deletion AUC (mean)"]
     faithful = [m for m in auc.index if m != "Random" and auc[m] < auc["Random"]]
     candidates = [m for m in localization.index if m != "Random" and (m in faithful or not faithful)]

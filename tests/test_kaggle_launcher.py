@@ -1,58 +1,43 @@
-"""Offline checks for the private-code Kaggle submission bundle."""
+"""The Kaggle launcher, offline: the folder it sends to Kaggle and the code packed in the notebook."""
 
 import json
-from pathlib import Path
-import tempfile
-from types import SimpleNamespace
-import unittest
+import shutil
+
+import pytest
 
 from scripts import kaggle_run
 
 
-class KaggleLauncherTest(unittest.TestCase):
-    def test_prepare_private_code_snapshot(self):
-        with tempfile.TemporaryDirectory() as folder:
-            self.check_snapshot(Path(folder))
+def test_build_packs_the_code_and_uses_your_account(tmp_path):
+    kernel = kaggle_run.build(tmp_path / "kernel", quick=True, user="someone")
+    assert kernel == "someone/bone-fracture-detection"
+    meta = json.loads((tmp_path / "kernel" / "kernel-metadata.json").read_text())
+    assert meta["id"] == kernel and meta["is_private"] and meta["enable_gpu"] and meta["code_file"] == "main.ipynb"
+    assert "mahmudulhasantasin/fracatlas-original-dataset" in meta["dataset_sources"]
 
-    def check_snapshot(self, stage):
-        dataset_id, provenance = kaggle_run.prepare(stage, quick=True)
+    notebook = json.loads((tmp_path / "kernel" / "main.ipynb").read_text())
+    unpack = notebook["cells"][0]["source"]
+    assert "QUICK      = True" in "".join("".join(c["source"]) for c in notebook["cells"])
+    assert all(c.get("outputs", []) == [] for c in notebook["cells"])
 
-        kernel_config = json.loads((kaggle_run.ROOT / "kernel-metadata.json").read_text())
-        owner, kernel_slug = kernel_config["id"].split("/", 1)
-        expected_prefix = f"{owner}/{kernel_slug[:20]}-code-"
-        self.assertTrue(dataset_id.startswith(expected_prefix))
-        self.assertIs(provenance["quick"], True)
-        self.assertIn("src/bootstrap.py", provenance["files"])
-        self.assertTrue(all(".git" not in path for path in provenance["files"]))
+    # the first cell really unpacks src/ (here into tmp_path instead of /tmp/bfd)
+    exec(unpack.replace(kaggle_run.UNPACK, (tmp_path / "code").as_posix()), {})
+    for name in ("src/data.py", "src/detect.py", "src/bootstrap.py", "requirements.txt"):
+        assert (tmp_path / "code" / name).read_text() == (kaggle_run.ROOT / name).read_text()
 
-        dataset_meta = json.loads((stage / "dataset" / "dataset-metadata.json").read_text())
-        kernel_meta = json.loads((stage / "kernel" / "kernel-metadata.json").read_text())
-        notebook = json.loads((stage / "kernel" / "main.ipynb").read_text())
-        notebook_source = "\n".join(
-            "".join(cell.get("source", "")) for cell in notebook["cells"]
-        )
 
-        self.assertEqual(dataset_meta["id"], dataset_id)
-        self.assertIn(dataset_id, kernel_meta["dataset_sources"])
-        self.assertIs(kernel_meta["is_private"], True)
-        self.assertNotIn("GITHUB_TOKEN", notebook_source)
-        self.assertIn(
-            f'BFD_CODE_SHA256 = "{provenance["snapshot_sha256"]}"', notebook_source
-        )
-        self.assertIn("QUICK      = True", notebook_source)
+def test_a_token_in_the_code_stops_the_upload(tmp_path):
+    root = tmp_path / "project"
+    for name in ("src", "notebooks"):
+        shutil.copytree(kaggle_run.ROOT / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
+    for name in ("requirements.txt", "kernel-metadata.json"):
+        shutil.copy(kaggle_run.ROOT / name, root / name)
+    (root / "src" / "leak.py").write_text('TOKEN = "ghp_' + "a" * 30 + '"\n')
+    with pytest.raises(SystemExit):
+        kaggle_run.build(tmp_path / "kernel", quick=False, user="someone", root=root)
 
-    def test_remote_snapshot_must_have_the_exact_checksum_filename(self):
-        digest = "a" * 64
-        expected = f"bfd-code-{digest}.json"
-        api = SimpleNamespace(
-            dataset_list_files=lambda *_args, **_kwargs: SimpleNamespace(
-                dataset_files=[SimpleNamespace(name=expected)]
-            )
-        )
-        kaggle_run.require_snapshot_file(api, "owner/code-aaaaaaaaaaaaaaaa", digest)
 
-        api.dataset_list_files = lambda *_args, **_kwargs: SimpleNamespace(
-            dataset_files=[SimpleNamespace(name="wrong.json")]
-        )
-        with self.assertRaisesRegex(RuntimeError, "no notebook was submitted"):
-            kaggle_run.require_snapshot_file(api, "owner/code-aaaaaaaaaaaaaaaa", digest)
+def test_username_from_the_flag_or_the_environment(monkeypatch):
+    assert kaggle_run.username("given") == "given"
+    monkeypatch.setenv("KAGGLE_USERNAME", "from-env")
+    assert kaggle_run.username() == "from-env"
