@@ -1,0 +1,16 @@
+{
+  "id": "sevastianguzun/bone-fracture-detection",
+  "title": "bone-fracture-detection",
+  "code_file": "notebooks/main.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_internet": true,
+  "dataset_sources": [
+    "bmadushanirodrigo/fracture-multi-region-x-ray-data"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

@@ -1,263 +1,216 @@
-# Bone Fracture Detection - Visual Intelligence Project
+# Bone Fracture Detection: CNN vs ScatNet, explained with XAI
 
-MSc in Artificial Intelligence - Visual Intelligence  
-Academic Year: 2025/2026  
-University of Verona
+MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
----
+Binary classification of X-rays (**fractured** / **not fractured**). A CNN trained from scratch and a
+wavelet Scattering Network (ScatNet, Kymatio) are compared, with an ImageNet-pretrained ResNet18 as a
+reference; all three end with **the same classifier**. The best model is chosen by cross-validation,
+tested once, its filters are compared with ScatNet's wavelets, and the models are explained with
+**six XAI methods** (Captum), one of which (Occlusion) is also implemented from scratch.
 
-## What is This Project?
+Everything runs from one notebook, `notebooks/main.ipynb`, on a **Kaggle GPU** (`./run.sh push`).
 
-This project tackles the critical medical challenge of **automatically detecting bone fractures in X-ray images** using deep learning. We compare different neural network architectures and use explainable AI (XAI) techniques to understand *how* and *why* the models make their predictions.
+## Exam requirements -> where
 
-### The Challenge
+| requirement (exam PDF) | where |
+|---|---|
+| binary dataset, train/test split | Kaggle *Bone Fracture Multi-Region X-ray Data*; notebook §1, `src/data.py` |
+| CNN + ScatNet, same classifier except input size | `src/models.py` (`Classifier`), notebook §2 (asserted) |
+| k-fold CV: mean accuracy + mean F1 on the training set | `training.cross_validate`, notebook §3 |
+| filters extracted and compared | notebook §6: `filters_cnn`, `filters_scatnet`, `frequency_coverage` |
+| test set, >= 75% accuracy | notebook §4, `training.evaluate_test` |
+| six XAI methods on CNN and ScatNet | `src/xai.py`: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM, Occlusion, LIME |
+| one method from scratch vs Captum | `src/occlusion_scratch.py`, notebook §8 |
+| attributions overlaid, 2 images per class, both models | notebook §7 (`xai_cnn`, `xai_scatnet`) |
+| quality of the attributions, methods that cannot be used | notebook §9 (deletion test, agreement), §11 |
+| learning curves train + val in one figure | `learning_curves.png` |
+| presentation | `presentation/main.pdf` (built from `results/`), `presentation/SPEAKER_NOTES.md` |
 
-Medical image analysis requires not just accurate predictions, but also interpretability. Doctors need to understand why an AI system classifies an image as showing a fracture. This project addresses both aspects:
+`python .claude/skills/exam-checklist/scripts/check_exam.py` checks all of this on a finished run.
 
-1. **Performance**: Build models that accurately classify bone fractures
-2. **Interpretability**: Explain which parts of the image influenced the decision
+## Results
 
----
+The numbers are produced by the Kaggle run and written to `results/summary.json`
+(`report.key_findings` prints them at the end of the notebook). They are not typed anywhere by hand:
+the slides read `results/latex/`. After `./run.sh get`, the full table is in `results/latex/test.tex`
+and in the notebook's §4-§5.
 
-## What We're Doing
+## Project layout
 
-### 1. Model Development & Comparison
-
-We implement and compare multiple deep learning architectures:
-
-- **Custom CNN**: A 4-layer convolutional neural network designed specifically for this task
-- **Transfer Learning Models**: Pre-trained ResNet and VGG models fine-tuned on bone fracture images
-- **Scattering Network (ScatNet)**: A wavelet-based approach using mathematical transforms instead of learned filters
-
-**Goal**: Determine which architecture works best for bone fracture detection and understand why.
-
-### 2. Rigorous Evaluation
-
-We don't just train once and hope for the best. Our evaluation includes:
-
-- **K-Fold Cross-Validation**: Train and validate models multiple times on different data splits to ensure robust performance
-- **Multiple Metrics**: Track accuracy, F1 score, precision, and recall
-- **Performance Target**: Achieve ≥75% accuracy on unseen test data
-
-**Goal**: Ensure our models generalize well and aren't just memorizing the training data.
-
-### 3. Filter Visualization
-
-Neural networks learn to detect patterns through filters. We visualize:
-
-- **CNN Filters**: What edge detectors, textures, and patterns did the CNN learn?
-- **ScatNet Filters**: How do wavelet-based features differ from learned CNN features?
-
-**Goal**: Understand what low-level features each model uses to detect fractures.
-
-### 4. Explainable AI (XAI) Analysis
-
-This is where we answer: *"Why did the model predict a fracture here?"*
-
-We implement and compare **six different XAI methods**:
-
-1. **Gradient-based Attribution**: Which pixels have the strongest influence on the prediction?
-2. **Integrated Gradients**: A more robust version that considers the entire path from baseline to input
-3. **GradCAM**: Which regions of the image are most important for the decision?
-4. **Saliency Maps**: Highlight the most sensitive pixels
-5. **DeepLift**: Compare activations to a reference baseline
-6. **Custom Implementation**: Build one method from scratch to deeply understand how it works
-
-**Goal**: Generate visual explanations showing which parts of the X-ray led to the fracture prediction, and compare which XAI method provides the most useful insights for medical professionals.
-
----
-
-## The Dataset
-
-- **Task**: Binary classification (Fractured vs. Non-fractured)
-- **Input**: X-ray images of bones
-- **Splits**: Training set (with cross-validation) and Test set
-
----
-
-## Technical Implementation
-
-### Models Architecture
-
-#### Custom CNN
-- 4 convolutional blocks with increasing filters [32 → 64 → 128 → 256]
-- Batch normalization and max pooling
-- Dropout for regularization
-- Fully connected classifier
-
-#### Transfer Learning (ResNet18/50, VGG16/19)
-- Pre-trained on ImageNet (1M+ images)
-- Fine-tuned on bone fracture dataset
-- Custom classifier head for binary classification
-
-#### ScatNet (To be implemented)
-- Wavelet scattering transform using Kymatio library
-- Mathematical feature extraction (no learning required for features)
-- Learned classifier on top of scattering coefficients
-
-### Training Strategy
-
-- **Optimizer**: Adam with learning rate scheduling
-- **Loss Function**: Cross-entropy loss
-- **Regularization**: Dropout, batch normalization
-- **Validation**: 5-fold cross-validation
-- **Early Stopping**: Prevent overfitting
-
-### XAI Implementation
-
-Each XAI method generates an **attribution map** that highlights important regions:
-- Bright areas = high importance for the prediction
-- Dark areas = low importance
-- Can be overlaid on original X-ray for interpretation
-
----
-
-## Getting Started
-
-### Installation
-
-Required libraries:
-- **PyTorch**: Deep learning framework
-- **Captum**: XAI methods library
-- **Kymatio**: Scattering network implementation
-- **scikit-learn**: Evaluation metrics and cross-validation
-- **matplotlib/seaborn**: Visualization
-
-### Running the Project
-
-1. **Open the notebook**: `bone_fracture_detection.ipynb`
-2. **Follow the workflow**:
-   - Load and explore the dataset
-   - Train models with cross-validation
-   - Evaluate on test set
-   - Visualize learned filters
-   - Generate XAI attribution maps
-   - Compare all results
-
-### Using the Modular Code
-
-The project is organized into reusable modules:
-
-```python
-# Import models
-from src.models import BoneFractureCNN, BoneFractureResNet18
-
-# Import training utilities
-from src.training import train_kfold_cv, test_model
-
-# Import visualization
-from src.visualization import PlotVisualizer
-
-# Import utilities
-from src.utils.device import get_device
-from src.utils.helpers import set_seed
+```
+bone-fracture-detection/
+├── notebooks/main.ipynb      the whole experiment: settings + calls to src (no function definitions)
+├── src/
+│   ├── bootstrap.py          Kaggle / Colab / local setup: packages, dataset path, output folders
+│   ├── data.py               load + cache X-rays, dataset study (sizes, balance, near-duplicates), loaders
+│   ├── models.py             BoneFractureCNN, ScatNet, ResNet18, one shared Classifier
+│   ├── training.py           grouped k-fold CV, final training, test metrics, bootstrap CI, McNemar
+│   ├── xai.py                six XAI methods, applicability, deletion test, agreement, scratch vs Captum
+│   ├── occlusion_scratch.py  Occlusion implemented from scratch
+│   ├── plots.py              every figure (fixed colours per model / class / method)
+│   ├── report.py             summary.json + LaTeX macros/tables for the slides
+│   └── utils.py              seed, device, parameter count, Kymatio/SciPy fix
+├── tests/                    pytest: unit tests + the notebook run end to end on synthetic X-rays
+├── presentation/             beamer slides (main.tex -> main.pdf), speaker notes
+├── results/                  written by the notebook: summary.json, cv/, final/, figures/, latex/
+│                             (models/ and attributions/ are large and gitignored)
+├── docs/previous_run/        CV logs of the first iteration (before the fixes listed below)
+├── kernel-metadata.json      Kaggle kernel: GPU, internet, dataset attached
+├── run.sh                    Windows/Linux shell entry point
+├── scripts/kaggle_run.py     private code snapshot + push / status / get
+└── .claude/skills/           kaggle-run, exam-checklist, presentation, ml-project-structure
 ```
 
----
+## Run it on Kaggle (recommended)
 
-## Expected Results
+Same pattern as `macura-drone`: the job runs on a Kaggle GPU, launched from your terminal; you can
+switch the PC off and download the results later.
 
-### Model Performance
-- Learning curves showing training/validation progress
-- Cross-validation results with mean ± std accuracy
-- Test set performance with confusion matrix
-- Comparison across all models
+**One-time setup**
+1. Activate the environment and install the local dependencies:
+   ```bash
+   conda activate bone-fracture
+   python -m pip install -r requirements.txt
+   ```
+2. Make sure the Kaggle account is phone-verified, then authenticate the CLI. OAuth is recommended
+   because it requests the permissions needed to create private Datasets and update Notebooks. If a
+   legacy key exists, move it aside first because it can take precedence over OAuth:
+   ```bash
+   mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup
+   kaggle auth login --force
+   ```
+   Sign in with the same Kaggle account named in `kernel-metadata.json` and accept the requested
+   permissions. If no browser opens, use
+   `kaggle auth login --force --no-launch-browser` and open the displayed URL manually.
+3. Put your Kaggle username in `kernel-metadata.json` (`"id": "<username>/bone-fracture-detection"`).
 
-### Filter Analysis
-- Visualization of what each model "sees"
-- Comparison of learned vs. wavelet features
-- Insights into feature hierarchies
+Do not put Kaggle keys or GitHub tokens in this repository. To restore the old legacy Kaggle key if
+needed, run `mv ~/.kaggle/kaggle.json.backup ~/.kaggle/kaggle.json`.
 
-### XAI Analysis
-- Attribution maps for correct predictions
-- Attribution maps for incorrect predictions
-- Comparison of different XAI methods
-- Validation: Custom implementation vs. Captum library
+### Setup for collaborators
 
----
+After pulling the repository, each collaborator uses their own Kaggle account and credentials.
+Change only the `id` line in `kernel-metadata.json`:
 
-## Academic Requirements
+```json
+"id": "COLLABORATOR_KAGGLE_USERNAME/bone-fracture-detection"
+```
 
-This project is part of the Visual Intelligence course:
+Then authenticate locally with that same account:
 
-- **Report**: 6-8 pages (individual) or 8-10 pages (group)
-- **Presentation**: 12 minutes (individual) or 15 minutes (group)
-- **Language**: English
-- **Deliverables**:
-  - Working code with all implementations
-  - Comprehensive analysis and comparison
-  - Visual results and explanations
-  - Critical discussion of findings
+```bash
+conda activate bone-fracture
+python -m pip install -r requirements.txt
+mv ~/.kaggle/kaggle.json ~/.kaggle/kaggle.json.backup  # only if the legacy file exists
+kaggle auth login --force
+./run.sh push --quick
+```
 
----
+No GitHub token is needed on Kaggle. Do not copy or commit another person's `kaggle.json`, access
+token, OAuth credentials, or `kaggle_remember_setup.txt`. The launcher tests derive the expected
+owner from `kernel-metadata.json`, so they do not require a username edit.
 
-## Key Questions We Answer
+GitHub authentication is needed only for `git clone` / `git pull` on your computer. The remote
+kernel never receives a GitHub token: `run.sh` uploads an allowlisted snapshot of `src/*.py` and
+`requirements.txt` as an immutable **private Kaggle Dataset**, then attaches it to the notebook.
+Identical source snapshots reuse that dataset. A changed snapshot creates one small private dataset
+that can later be removed from Kaggle when its reproducibility record is no longer needed.
 
-1. **Which model architecture works best for bone fracture detection?**
-   - Compare CNN, ResNet, VGG, ScatNet
-   - Analyze trade-offs: accuracy vs. complexity vs. interpretability
+`kernel-metadata.json`: `code_file` = the notebook, `enable_gpu` with `machine_shape: NvidiaTeslaT4`
+(recent PyTorch builds no longer support the older P100), `enable_internet` true (pip install
+kymatio/captum + ResNet18 weights), `dataset_sources` =
+`bmadushanirodrigo/fracture-multi-region-x-ray-data` (mounted read-only under `/kaggle/input`).
+The launcher adds the private code snapshot to `dataset_sources` only in its staged metadata.
 
-2. **What features do the models learn?**
-   - Visualize and interpret learned filters
-   - Compare learned features vs. wavelet features
+**Run**
+```bash
+conda activate bone-fracture
+cd ~/Desktop/bone-fracture-detection
 
-3. **Which XAI method provides the most useful explanations?**
-   - Compare attribution quality across 6 methods
-   - Evaluate medical interpretability
+./run.sh push --quick --dry-run  # inspect the staged files locally; no Kaggle connection
+./run.sh push --quick     # 5-minute health check on a small subset (do it once)
+./run.sh status           # queued / running / complete / error
+./run.sh push             # the full run, ~2-3 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI)
+./run.sh get              # download into ./out and copy the results into ./results
+./run.sh slides           # rebuild presentation/main.pdf with the new numbers
+./run.sh stop             # print the Kaggle page where a running session can be stopped
+./run.sh                  # show launcher help
+```
+The launcher uploads the files from the currently checked-out local branch, including uncommitted
+source edits. It records the branch, commit and snapshot checksum in the staged notebook metadata.
+After Kaggle accepts the job, it runs independently and the PC can be switched off. Each download is
+kept in a separate `out/run-<timestamp>/` folder so a failed run cannot erase an earlier result.
+Outputs (in `/kaggle/working/results` on the kernel): `summary.json`, `cv/`, `final/`, `figures/`,
+`latex/`, `models/*.pth`, `attributions/*.npz`.
 
-4. **Can we trust the model's predictions?**
-   - Analyze attribution maps for correct/incorrect predictions
-   - Identify potential biases or artifacts
+Recommended order: run `push --quick`, monitor with `status`, and download with `get`. If that
+health check succeeds, start the full run with `push`. Wait for `Kaggle accepted the job; the PC can
+now be switched off.` before closing the terminal or turning off the computer.
 
-5. **How does our custom XAI implementation compare to established libraries?**
-   - Validate correctness
-   - Understand implementation details
+If Dataset creation ends with `403 Forbidden` after the file upload reaches 100%, the file transfer
+succeeded but Kaggle rejected creation of the Dataset. Repeat the OAuth setup above and accept the
+Dataset/Notebook permissions; do not add a token to the notebook or repository.
 
----
+## Run it locally
 
-## References & Resources
+```bash
+pip install -r requirements.txt
+# dataset: download the Kaggle dataset and unzip it into data/ (any depth: the train/ val/ test/ folder is found)
+jupyter notebook notebooks/main.ipynb
+```
+Only the **Settings** cell needs editing (`QUICK`, `TRAIN`, `MODELS`, `EPOCHS`, ...). With `TRAIN = False`
+the notebook reloads `results/models/*.pth` and the JSON logs of a previous run and only redraws.
+Environment variables `BFD_DATA_DIR` / `BFD_RESULTS_DIR` override the paths without editing the notebook.
 
-- **PyTorch**: https://pytorch.org/docs/
-- **Captum (XAI)**: https://captum.ai/
-- **Kymatio (ScatNet)**: https://www.kymat.io/
+## Tests
 
-### Key Papers
-- Integrated Gradients: Sundararajan et al. (2017)
-- GradCAM: Selvaraju et al. (2017)
-- DeepLift: Shrikumar et al. (2017)
-- Scattering Networks: Bruna & Mallat (2013)
+```bash
+pytest -m "not slow"   # ~2-5 min on a CPU: data, duplicates, models, training, every XAI method, report
+pytest -m slow         # the whole notebook on synthetic X-rays (tests/synthetic.py), QUICK mode
+```
+What they prove without the real data: identical classifiers; every method runs on every model and
+Grad-CAM is refused on ScatNet; our Occlusion equals Captum's (to 1e-5); Integrated Gradients
+satisfies completeness; the deletion test ranks the correct map first; grouped folds never split a
+duplicate group; planted flipped/rotated/brightened copies are found; a model overfits 16 images;
+the notebook runs top to bottom. CI runs both on every push (`.github/workflows/tests.yml`).
 
----
+## Design choices (and why)
 
-## Contact
+- **Grey input, 1 channel**: X-rays are grey; 3 identical channels only triple ScatNet's coefficients.
+- **CNN**: 4 conv blocks 32 -> 256 with BN and max-pool; the **first layer is 7x7** so that its filters
+  show a shape that can be compared with the wavelets.
+- **ScatNet**: Kymatio `Scattering2D(J=4, L=8)`, second order: 417 maps on the same 14x14 grid as the
+  CNN; coefficients log-compressed and batch-normalised (their magnitudes span orders).
+- **Same classifier** `flatten -> 512 -> 128 -> 2` (ReLU, dropout 0.5) for every model.
+- **Near-duplicates**: the training set contains copies of the same X-ray. Cross-validation is
+  **grouped** by copy, and test accuracy is also reported on the **clean** test images (no copy in train).
+- **Honest CV**: fold scores at the last epoch (nothing selected on the validation fold); the best model
+  is chosen on CV (`SELECT_BY = "f1"`), never on the test set; the test set is used once, with a
+  bootstrap 95% interval and McNemar tests between models.
+- **Final models** trained on the whole training split; the separate `val` split picks the epoch.
+- **XAI**: six methods from four families, so the discussion can compare them and show that
+  **Grad-CAM cannot be applied to ScatNet** (no learned conv feature map) and **Guided Backprop only
+  partly** (the scattering non-linearity is a modulus, not a ReLU). "Removed" pixels are **black**
+  (the X-ray background): a grey baseline made the first version highlight the background.
+- **Quality of the attributions** is measured, not only looked at: deletion test (faithfulness) and
+  Spearman agreement between methods.
 
-**Course Instructors:**
-- Prof. Gloria Menegaz: gloria.menegaz@univr.it
-- Giorgio Dolci: giorgio.dolci@univr.it
+## Previous iteration and what changed
 
----
+The first version (branch `xai`, team notebook) reached CV 97.4 / 98.3 / 96.7% and test 92.9 / 94.7 /
+90.5% for CNN / ResNet18 / ScatNet (logs in `docs/previous_run/`). It had: different classifiers for
+CNN and ScatNet, CV folds mixing copies of an X-ray and scored at the best epoch (4-6 points CV/test
+gap), RGB input, a grey Occlusion baseline, F1 computed for the wrong class, and no Kaggle setup.
+All fixed here. The old notebooks and attribution files are in the history of branch `xai`.
 
-## License
+> **Security**: a Kaggle API key was committed in an old notebook (branch `xai` history). Revoke it
+> on kaggle.com (Settings -> API -> Expire token) if not done yet.
 
-This project is developed for academic purposes as part of the Visual Intelligence course at the University of Verona.
+## References
 
----
+Bruna & Mallat 2013 (scattering networks) · Simonyan et al. 2014 (saliency) · Springenberg et al.
+2015 (guided backprop) · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan
+et al. 2017 (integrated gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion /
+region perturbation) · Captum (captum.ai) · Kymatio (kymat.io).
 
-## Project Organization
-
-The codebase is organized into modular components:
-
-- `src/models/` - Neural network architectures (CNN, ResNet, VGG, ScatNet)
-- `src/training/` - Training loops, evaluation, cross-validation
-- `src/visualization/` - Plotting and visualization utilities
-- `src/xai/` - Explainable AI methods (6 implementations)
-- `src/utils/` - Helper functions and device management
-- `src/config/` - Model and training configurations
-- `outputs/` - Saved models, figures, and results
-- `notebooks/` - Experimental notebooks
-
-This modular structure makes it easy to:
-- Add new models or XAI methods
-- Reuse components across experiments
-- Test individual modules
-- Maintain and extend the codebase
+Course instructors: Prof. Gloria Menegaz, Giorgio Dolci.
