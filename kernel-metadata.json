@@ -9,7 +9,7 @@
   "machine_shape": "NvidiaTeslaT4",
   "enable_internet": true,
   "dataset_sources": [
-    "bmadushanirodrigo/fracture-multi-region-x-ray-data"
+    "mahmudulhasantasin/fracatlas-original-dataset"
   ],
   "competition_sources": [],
   "kernel_sources": []

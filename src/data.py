@@ -1,14 +1,18 @@
-"""Data: find the dataset, load and cache the images, study the dataset, build the data loaders.
+"""Data: find the dataset, load and cache the images and fracture boxes, split, build the data loaders.
 
-Kaggle dataset "Bone Fracture Multi-Region X-ray Data" (bmadushanirodrigo/fracture-multi-region-x-ray-data):
+FracAtlas (Abedeen et al., Scientific Data 2023; Kaggle: mahmudulhasantasin/fracatlas-original-dataset):
+4,083 X-rays of hands, legs, hips and shoulders from three hospitals, 717 of them fractured.
+Radiologists drew a box around every fracture, so we can check whether an explanation points at it.
 
-    <data_dir>/train/{fractured, not fractured}/   ~9.2k images: cross-validation + final training
-    <data_dir>/val/{fractured, not fractured}/      ~0.8k images: monitoring of the final training
-    <data_dir>/test/{fractured, not fractured}/     ~0.5k images: final evaluation only
+    <data_dir>/images/Fractured/IMG*.jpg         717 images   (label 0, the positive class)
+    <data_dir>/images/Non_fractured/IMG*.jpg     3,366 images (label 1)
+    <data_dir>/Annotations/YOLO/IMG*.txt         boxes of the fractured images, one "class cx cy w h"
+                                                 line per fracture, normalised to [0, 1]
 
-X-rays are grey, so every image is loaded as ONE channel, resized to 224x224 and kept in memory
-as uint8 (about 0.5 GB for the whole dataset), which makes every epoch GPU-bound.
-Labels follow the sorted folder names: 0 = 'fractured', 1 = 'not fractured'.
+There is no official split: `split_indices` makes a stratified train / val / test split in which
+copies of the same X-ray (near-duplicates) always stay together.
+X-rays are grey, so every image is loaded as ONE channel, resized to 224x224 and kept in memory as
+uint8; the boxes are rescaled with it.
 """
 
 import os
@@ -23,13 +27,15 @@ import torch.nn.functional as F
 from PIL import Image, ImageFile
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
+from sklearn.model_selection import StratifiedGroupKFold
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import v2
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True  # a few X-rays in the dataset are truncated files
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # tolerate truncated JPEG files
 
 IMAGE_SIZE = 224
-SPLITS = ("train", "val", "test")
+CLASS_FOLDERS = ("Fractured", "Non_fractured")   # label 0, label 1
+CLASS_NAMES = ["fractured", "not fractured"]
 IMG_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 MEAN, STD = 0.5, 0.5   # pixels [0, 1] -> [-1, 1]
 BLACK = -1.0           # a black pixel after normalisation: the "removed" value used by the XAI methods
@@ -38,34 +44,36 @@ BLACK = -1.0           # a black pixel after normalisation: the "removed" value 
 # ----------------------------------------------------------------------------- loading
 
 def find_data_dir(root):
-    """First folder under `root` (itself included) that has `train/` and `test/` subfolders."""
+    """First folder under `root` (itself included) that has images/Fractured and images/Non_fractured."""
     root = Path(root)
     for dirpath, dirnames, _ in os.walk(root):
-        if {"train", "test"} <= set(dirnames):
+        if all((Path(dirpath) / "images" / folder).is_dir() for folder in CLASS_FOLDERS):
             return Path(dirpath)
         if len(Path(dirpath).relative_to(root).parts) >= 5:
             dirnames[:] = []  # do not walk deeper
     raise FileNotFoundError(
-        f"No folder with train/ and test/ found under {root}. On Kaggle, attach the dataset "
-        "'bmadushanirodrigo/fracture-multi-region-x-ray-data'; locally, download it into data/.")
+        f"No folder with images/Fractured and images/Non_fractured found under {root}. On Kaggle, attach the "
+        "dataset 'mahmudulhasantasin/fracatlas-original-dataset'; locally, unzip FracAtlas into data/.")
 
 
 @dataclass
 class ImageSet:
-    """All images of one split in memory."""
+    """Images in memory, with their labels and fracture boxes."""
     images: np.ndarray   # (N, S, S) uint8, grey
     labels: np.ndarray   # (N,) int64
     paths: list          # file path of every image
     sizes: np.ndarray    # (N, 2) original width and height in pixels
     class_names: list
+    boxes: list          # per image: (k, 4) float array of fracture boxes (x0, y0, x1, y1) in pixels of
+                         # the S x S image; k = 0 for a healthy X-ray
 
     def __len__(self):
         return len(self.labels)
 
     def subset(self, idx):
         idx = np.asarray(idx)
-        return ImageSet(self.images[idx], self.labels[idx], [self.paths[i] for i in idx],
-                        self.sizes[idx], self.class_names)
+        return ImageSet(self.images[idx], self.labels[idx], [self.paths[i] for i in idx], self.sizes[idx],
+                        self.class_names, [self.boxes[i] for i in idx])
 
     def tensors(self, idx=None):
         """Normalised float images (n, 1, S, S) and labels (n,), e.g. for the XAI methods."""
@@ -85,55 +93,74 @@ def _read(path, size):
         return None, None
 
 
-def load_split(split_dir, size=IMAGE_SIZE, cache_dir=None, max_per_class=None, seed=0, workers=8):
-    """Load one split (split_dir/<class>/<image>) into an ImageSet, cached as .npz in `cache_dir`.
+def read_boxes(path, size):
+    """Boxes of one YOLO file as a (k, 4) array (x0, y0, x1, y1) in pixels of the size x size image.
 
+    YOLO coordinates are fractions of the width and height, so they survive the resize unchanged.
+    No file (a healthy X-ray) -> no box.
+    """
+    path = Path(path)
+    if not path.exists() or path.stat().st_size == 0:
+        return np.zeros((0, 4), np.float32)
+    cx, cy, w, h = np.loadtxt(path, ndmin=2)[:, 1:5].T
+    return (np.stack([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2], 1).clip(0, 1) * size).astype(np.float32)
+
+
+def load_dataset(data_dir, size=IMAGE_SIZE, cache_dir=None, max_per_class=None, seed=0, workers=8):
+    """Every image of the dataset and its fracture boxes, as one ImageSet.
+
+    The decoded images are cached as .npz in `cache_dir`; the boxes (small text files) are read every time.
     `max_per_class` keeps a random subset of each class (quick test runs).
     """
-    split_dir = Path(split_dir)
-    class_names = sorted(d.name for d in split_dir.iterdir() if d.is_dir())
-    cache = None
-    if cache_dir is not None:
-        cache = Path(cache_dir) / f"{split_dir.name}_{size}px_{max_per_class or 'all'}.npz"
-        if cache.exists():
-            with np.load(cache, allow_pickle=False) as f:
-                return ImageSet(f["images"], f["labels"], list(f["paths"]), f["sizes"], list(f["class_names"]))
+    data_dir = Path(data_dir)
+    cache = Path(cache_dir) / f"fracatlas_{size}px_{max_per_class or 'all'}.npz" if cache_dir else None
+    if cache is not None and cache.exists():
+        with np.load(cache, allow_pickle=False) as f:
+            images, labels, paths, sizes = f["images"], f["labels"], list(f["paths"]), f["sizes"]
+    else:
+        rng = np.random.default_rng(seed)
+        files = []
+        for label, folder in enumerate(CLASS_FOLDERS):
+            found = sorted(p for p in (data_dir / "images" / folder).iterdir() if p.suffix.lower() in IMG_EXTENSIONS)
+            if max_per_class is not None and len(found) > max_per_class:
+                found = [found[i] for i in sorted(rng.choice(len(found), max_per_class, replace=False))]
+            files += [(p, label) for p in found]
+        with ThreadPoolExecutor(workers) as pool:  # PIL releases the GIL while decoding
+            loaded = list(pool.map(lambda f: _read(f[0], size), files))
+        keep = [i for i, (image, _) in enumerate(loaded) if image is not None]
+        if len(keep) < len(files):
+            print(f"skipped {len(files) - len(keep)} unreadable files")
+        images = np.stack([loaded[i][0] for i in keep])
+        labels = np.array([files[i][1] for i in keep], dtype=np.int64)
+        paths = [str(files[i][0]) for i in keep]
+        sizes = np.array([loaded[i][1] for i in keep], dtype=np.int64)
+        if cache is not None:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            np.savez(cache, images=images, labels=labels, paths=np.array(paths), sizes=sizes)
 
-    rng = np.random.default_rng(seed)
-    files = []
-    for label, name in enumerate(class_names):
-        paths = sorted(p for p in (split_dir / name).iterdir() if p.suffix.lower() in IMG_EXTENSIONS)
-        if max_per_class is not None and len(paths) > max_per_class:
-            paths = [paths[i] for i in sorted(rng.choice(len(paths), max_per_class, replace=False))]
-        files += [(p, label) for p in paths]
-
-    with ThreadPoolExecutor(workers) as pool:  # PIL releases the GIL while decoding
-        loaded = list(pool.map(lambda f: _read(f[0], size), files))
-    keep = [i for i, (image, _) in enumerate(loaded) if image is not None]
-    if len(keep) < len(files):
-        print(f"{split_dir.name}: skipped {len(files) - len(keep)} unreadable files")
-
-    image_set = ImageSet(
-        images=np.stack([loaded[i][0] for i in keep]),
-        labels=np.array([files[i][1] for i in keep], dtype=np.int64),
-        paths=[str(files[i][0]) for i in keep],
-        sizes=np.array([loaded[i][1] for i in keep], dtype=np.int64),
-        class_names=class_names,
-    )
-    if cache is not None:
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(cache, images=image_set.images, labels=image_set.labels, paths=np.array(image_set.paths),
-                 sizes=image_set.sizes, class_names=np.array(class_names))
-    return image_set
+    yolo = next((d for d in sorted(data_dir.rglob("YOLO")) if d.is_dir()), None)
+    if yolo is None:
+        raise FileNotFoundError(f"No YOLO annotation folder under {data_dir}: the fracture boxes are missing.")
+    boxes = [read_boxes(yolo / f"{Path(p).stem}.txt", size) for p in paths]
+    return ImageSet(images, labels, paths, sizes, list(CLASS_NAMES), boxes)
 
 
-def load_splits(data_dir, splits=SPLITS, **kwargs):
-    """{split: ImageSet} for every split folder that exists in data_dir."""
-    sets = {s: load_split(Path(data_dir) / s, **kwargs) for s in splits if (Path(data_dir) / s).is_dir()}
-    names = {tuple(s.class_names) for s in sets.values()}
-    if len(names) != 1:
-        raise ValueError(f"The splits have different class folders: {names}")
-    return sets
+def split_indices(labels, groups, val=0.15, test=0.15, seed=0):
+    """Stratified train / val / test indices; near-duplicates (same group) never cross splits.
+
+    Each part is one fold of a stratified group k-fold (k = 1 / fraction), so the sizes are close
+    to, not exactly, the requested fractions.
+    """
+    labels, groups = np.asarray(labels), np.asarray(groups)
+
+    def carve(pool, fraction):
+        splitter = StratifiedGroupKFold(n_splits=round(1 / fraction), shuffle=True, random_state=seed)
+        rest, part = next(splitter.split(pool, labels[pool], groups[pool]))
+        return pool[rest], pool[part]
+
+    rest, test_idx = carve(np.arange(len(labels)), test)
+    train_idx, val_idx = carve(rest, val / (1 - test))
+    return {"train": np.sort(train_idx), "val": np.sort(val_idx), "test": np.sort(test_idx)}
 
 
 # ----------------------------------------------------------------------------- training data
@@ -198,13 +225,14 @@ def pick_images(labels, n_per_class, seed=0, allowed=None):
 # ----------------------------------------------------------------------------- dataset study
 
 def summary_table(sets):
-    """Images per split and class, class balance and original image size."""
+    """Images per split and class, class balance, fracture boxes and original image size."""
     rows = {}
     for split, s in sets.items():
         counts = np.bincount(s.labels, minlength=len(s.class_names))
         rows[split] = {**{name: int(n) for name, n in zip(s.class_names, counts)},
                        "total": len(s),
                        f"% {s.class_names[0]}": round(100 * counts[0] / len(s), 1),
+                       "fracture boxes": int(sum(len(b) for b in s.boxes)),
                        "median width (px)": int(np.median(s.sizes[:, 0])),
                        "median height (px)": int(np.median(s.sizes[:, 1])),
                        "mean intensity": round(float(s.images.mean()) / 255, 3)}
@@ -220,22 +248,20 @@ def _thumbnails(images, size, device):
     return views / views.norm(dim=-1, keepdim=True).clamp_min(1e-6)
 
 
-def near_duplicates(images_a, images_b=None, threshold=0.97, size=32, device="cpu", chunk=512):
-    """Pairs of images that show the same X-ray: DataFrame(i, j, similarity).
+def near_duplicates(images, threshold=0.97, size=32, device="cpu", chunk=512):
+    """Pairs of images (i < j) that show the same X-ray: DataFrame(i, j, similarity).
 
     Two images match when the cosine similarity of their 32x32 zero-mean thumbnails is >= threshold
     for one of the 8 flips/90° rotations. This finds copies that were resized, re-compressed,
     flipped, rotated by 90° or changed in brightness/contrast; copies rotated by other angles or
-    cropped are missed, so the counts are a lower bound. With images_b=None: pairs inside images_a (i < j).
+    cropped are missed, so the counts are a lower bound.
     """
-    a = _thumbnails(images_a, size, device)
-    b = a[0] if images_b is None else _thumbnails(images_b, size, device)[0]
+    views = _thumbnails(images, size, device)
     rows = []
-    for start in range(0, a.shape[1], chunk):
-        sim = torch.einsum("vnd,md->vnm", a[:, start:start + chunk], b).amax(0)  # best of the 8 views
-        if images_b is None:  # every pair once, not with itself
-            i_global = torch.arange(start, start + sim.shape[0], device=sim.device)[:, None]
-            sim = sim.masked_fill(torch.arange(sim.shape[1], device=sim.device)[None] <= i_global, -1)
+    for start in range(0, views.shape[1], chunk):
+        sim = torch.einsum("vnd,md->vnm", views[:, start:start + chunk], views[0]).amax(0)  # best of the 8 views
+        i_global = torch.arange(start, start + sim.shape[0], device=sim.device)[:, None]
+        sim = sim.masked_fill(torch.arange(sim.shape[1], device=sim.device)[None] <= i_global, -1)  # each pair once
         i, j = torch.nonzero(sim >= threshold, as_tuple=True)
         rows.append(np.column_stack([(i + start).cpu().numpy(), j.cpu().numpy(), sim[i, j].cpu().numpy()]))
     pairs = np.concatenate(rows) if rows else np.zeros((0, 3))
@@ -248,27 +274,18 @@ def duplicate_groups(n, pairs):
     return connected_components(graph, directed=False)[1]
 
 
-def study_duplicates(sets, threshold=0.97, device="cpu"):
-    """Near-duplicates inside the training set and between the other splits and the training set.
+def study_duplicates(image_set, threshold=0.97, device="cpu"):
+    """Near-duplicates in the dataset: a group id per image (copies share one), the pairs, a summary table.
 
-    Returns groups (a group id per training image, for group-aware cross-validation), the pairs,
-    a boolean `leaked[split]` (image has a near-duplicate in train) and a summary table.
+    The groups keep the copies of one X-ray together in the train / val / test split and in the
+    cross-validation folds.
     """
-    train = sets["train"]
-    pairs = {"train": near_duplicates(train.images, threshold=threshold, device=device)}
-    groups = duplicate_groups(len(train), pairs["train"])
+    pairs = near_duplicates(image_set.images, threshold=threshold, device=device)
+    groups = duplicate_groups(len(image_set), pairs)
     sizes = np.bincount(groups)
-    rows = {"train": {"images": len(train),
-                      "with a near-duplicate in train": int((sizes[groups] > 1).sum()),
-                      "duplicate groups": int((sizes > 1).sum()),
-                      "largest group": int(sizes.max())}}
-    leaked = {}
-    for split in sets:
-        if split == "train":
-            continue
-        pairs[split] = near_duplicates(sets[split].images, train.images, threshold, device=device)
-        leaked[split] = np.isin(np.arange(len(sets[split])), pairs[split]["i"])
-        rows[split] = {"images": len(sets[split]), "with a near-duplicate in train": int(leaked[split].sum())}
-    table = pd.DataFrame.from_dict(rows, orient="index").astype("Int64")
-    table["%"] = (100 * table["with a near-duplicate in train"] / table["images"]).round(1)
-    return {"groups": groups, "pairs": pairs, "leaked": leaked, "table": table}
+    table = pd.DataFrame({"images": [len(image_set)],
+                          "with a near-duplicate": [int((sizes[groups] > 1).sum())],
+                          "duplicate groups": [int((sizes > 1).sum())],
+                          "largest group": [int(sizes.max())]}, index=["dataset"])
+    table["%"] = (100 * table["with a near-duplicate"] / table["images"]).round(1)
+    return {"groups": groups, "pairs": pairs, "table": table}

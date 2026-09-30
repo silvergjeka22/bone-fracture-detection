@@ -11,9 +11,12 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 from scipy.ndimage import gaussian_filter
 
 from .data import denormalize
+from .localize import evidence, heatmap_to_box, iou, pointing_game
 from .utils import patch_scipy_for_kymatio
 
 patch_scipy_for_kymatio()
@@ -27,7 +30,9 @@ CLASS_COLORS = ["#4a3aa7", "#eda100"]  # fractured, not fractured
 METHOD_COLORS = {"Saliency": "#2a78d6", "Integrated Gradients": "#eb6834", "Guided Backprop": "#1baf7a",
                  "Grad-CAM": "#eda100", "Occlusion": "#e87ba4", "LIME": "#008300",
                  "Occlusion (ours)": "#4a3aa7", "Random": NEUTRAL}
+BOX_COLORS = {"radiologist": "#00c2d1", "ours": "#ffd23f"}  # fracture boxes drawn on the X-rays
 DIVERGING = LinearSegmentedColormap.from_list("evidence", ["#1c5cab", "#2a78d6", "#f0efec", "#e34948", "#a8211f"])
+POSITIVE = LinearSegmentedColormap.from_list("for", ["#f0efec", "#e34948", "#a8211f"])  # evidence for the class
 SEQUENTIAL = LinearSegmentedColormap.from_list("blues", ["#f0efec", "#9ec5f4", "#3987e5", "#1c5cab", "#0d366b"])
 
 mpl.rcParams.update({
@@ -58,10 +63,17 @@ def _grid_axes(ax, axis="y"):
     ax.set_axisbelow(True)
 
 
+def _draw_box(ax, box, who):
+    """A fracture box (x0, y0, x1, y1) in pixel coordinates: the radiologist's dashed, ours solid."""
+    x0, y0, x1, y1 = box
+    ax.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), x1 - x0, y1 - y0, fill=False, linewidth=1.6,
+                           edgecolor=BOX_COLORS[who], linestyle="--" if who == "radiologist" else "-"))
+
+
 # ----------------------------------------------------------------------------- data
 
 def show_samples(image_set, n_per_class=5, seed=0, title=None, save_to=None):
-    """A row of random images per class."""
+    """A row of random images per class, with the radiologists' fracture boxes."""
     rng = np.random.default_rng(seed)
     classes = image_set.class_names
     fig, axes = plt.subplots(len(classes), n_per_class, figsize=(2.1 * n_per_class, 2.3 * len(classes)), squeeze=False)
@@ -69,6 +81,8 @@ def show_samples(image_set, n_per_class=5, seed=0, title=None, save_to=None):
         idx = rng.choice(np.flatnonzero(image_set.labels == c), n_per_class, replace=False)
         for ax, i in zip(axes[c], idx):
             ax.imshow(image_set.images[i], cmap="gray", vmin=0, vmax=255)
+            for box in image_set.boxes[i]:
+                _draw_box(ax, box, "radiologist")
             ax.set_xticks([])
             ax.set_yticks([])
             for spine in ax.spines.values():
@@ -114,15 +128,15 @@ def plot_dataset_overview(sets, save_to=None):
     _finish(fig, save_to)
 
 
-def show_duplicate_pairs(set_a, set_b, pairs, n=6, title=None, save_to=None):
-    """The n most similar pairs: image of set_a above, its near-duplicate in set_b below."""
+def show_duplicate_pairs(image_set, pairs, n=6, title=None, save_to=None):
+    """The n most similar pairs of near-duplicates: one image above, its copy below."""
     pairs = pairs.sort_values("similarity", ascending=False).head(n)
     if len(pairs) == 0:
         print("no near-duplicates found")
         return
     fig, axes = plt.subplots(2, len(pairs), figsize=(2.1 * len(pairs), 4.6), squeeze=False)
     for k, (_, row) in enumerate(pairs.iterrows()):
-        for r, (image_set, idx) in enumerate([(set_a, int(row["i"])), (set_b, int(row["j"]))]):
+        for r, idx in enumerate([int(row["i"]), int(row["j"])]):
             ax = axes[r, k]
             ax.imshow(image_set.images[idx], cmap="gray", vmin=0, vmax=255)
             ax.axis("off")
@@ -415,4 +429,70 @@ def plot_deletion_curves(curves, save_to=None):
         ax.legend(fontsize=7.5, title="method (area)", title_fontsize=8)
     axes[0, 0].set_ylabel("probability of the true class")
     fig.suptitle("Deletion test: lower = more faithful attribution")
+    _finish(fig, save_to)
+
+
+# ----------------------------------------------------------------------------- fracture boxes
+
+def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, title=None, save_to=None):
+    """Rows = fractured X-rays, columns = XAI methods. Radiologist's box (dashed), our box (solid) and
+    the evidence for 'fractured': strong inside our box, faint outside it (so nothing is hidden)."""
+    methods = list(methods or maps)
+    fig, axes = plt.subplots(len(images), len(methods), figsize=(2.0 * len(methods), 2.15 * len(images)),
+                             squeeze=False)
+    for row, (image, truth) in enumerate(zip(images, true_boxes)):
+        for col, method in enumerate(methods):
+            ax, attribution = axes[row, col], maps[method][row]
+            ax.imshow(denormalize(image), cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            if row == 0:
+                ax.set_title(method, fontsize=9.5)
+            for box in truth:
+                _draw_box(ax, box, "radiologist")
+            if np.isnan(attribution).all():
+                ax.text(0.5, 0.5, "not\napplicable", transform=ax.transAxes, ha="center", va="center",
+                        fontsize=10, color=INK, bbox=dict(facecolor=SURFACE, edgecolor=GRID, alpha=0.9))
+                continue
+            heat = evidence(attribution)
+            heat = heat / (heat.max() or 1)
+            alpha = 0.25 * heat
+            box = heatmap_to_box(attribution, threshold)
+            if box is not None:
+                x0, y0, x1, y1 = box.astype(int)
+                alpha[y0:y1, x0:x1] = 0.85 * heat[y0:y1, x0:x1]
+                _draw_box(ax, box, "ours")
+            ax.imshow(heat, cmap=POSITIVE, vmin=0, vmax=1, alpha=alpha)
+            hit = "hit" if pointing_game(attribution, truth) else "miss"
+            ax.text(0.03, 0.03, f"{hit}, IoU {iou(box, truth):.2f}", transform=ax.transAxes, ha="left", va="bottom",
+                    fontsize=7.5, color=INK, bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["ours"], label="our box (from the map)")]
+    fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.02))
+    if title:
+        fig.suptitle(title, fontsize=12)
+    _finish(fig, save_to)
+
+
+def plot_localization(tables, save_to=None):
+    """Pointing game ({model: localization table}): how often the hottest point of each method's map
+    lies inside a radiologist's box. Dashed line = a random point."""
+    methods = [m for m in METHOD_COLORS if m not in ("Random", "Occlusion (ours)")
+               and any(m in t.index for t in tables.values())]
+    random = next(iter(tables.values())).loc["Random", "hit rate (%)"]  # same images for every model
+    width = 0.8 / len(tables)
+    fig, ax = plt.subplots(figsize=(8.5, 3.6))
+    for k, (name, t) in enumerate(tables.items()):
+        x = np.arange(len(methods)) + (k - (len(tables) - 1) / 2) * width
+        values = [t.loc[m, "hit rate (%)"] if m in t.index else np.nan for m in methods]
+        ax.bar(x, values, width * 0.92, color=MODEL_COLORS.get(name, INK), label=_label(name))
+        for xi, v in zip(x, values):
+            if np.isnan(v):
+                ax.text(xi, random + 2, "n/a", ha="center", va="bottom", fontsize=7, color=INK_2)
+    ax.axhline(random, color=NEUTRAL, linestyle="--", linewidth=1.2, label=f"random point ({random:.0f}%)")
+    ax.set_xticks(range(len(methods)), [m.replace(" ", "\n") for m in methods])
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("hottest point inside\nthe radiologist's box (%)")
+    ax.set_title("Does the explanation point at the fracture? (fractured test X-rays)")
+    _grid_axes(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=len(tables) + 1)
     _finish(fig, save_to)

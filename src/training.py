@@ -8,6 +8,9 @@ Protocol
     2. Final model: trained on the whole training split; the VAL split picks the best epoch.
     3. TEST split: used once, to evaluate the final models.
 
+The loss weights each class by its inverse frequency (`class_weights`): about 1 X-ray in 6 is
+fractured, and an unweighted loss would learn to miss fractures.
+
 Files written to results_dir:  cv/<model>.json, final/<model>.json, models/<model>.pth
 """
 
@@ -49,51 +52,67 @@ def compute_metrics(y_true, probs):
     }
 
 
-def train_one_epoch(model, loader, optimizer, device):
+def class_weights(labels, num_classes=2):
+    """Inverse class frequency, 1 on average: both classes weigh the same in the loss."""
+    counts = np.bincount(np.asarray(labels), minlength=num_classes).astype(float)
+    return torch.tensor(counts.sum() / (num_classes * np.maximum(counts, 1)), dtype=torch.float32)
+
+
+def train_one_epoch(model, loader, optimizer, device, weight=None):
+    """One pass over `loader`; returns the (weighted) mean loss and the accuracy."""
     model.train()
-    criterion = nn.CrossEntropyLoss()
-    total_loss, correct, seen = 0.0, 0, 0
+    weight = None if weight is None else weight.to(device)
+    criterion = nn.CrossEntropyLoss(weight=weight)
+    total_loss, total_weight, correct, seen = 0.0, 0.0, 0, 0
     for images, labels in loader:
         images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
         outputs = model(images)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, labels)  # weighted mean over the batch
         loss.backward()
         optimizer.step()
-        total_loss += loss.item() * len(labels)
+        batch_weight = len(labels) if weight is None else weight[labels].sum().item()
+        total_loss += loss.item() * batch_weight
+        total_weight += batch_weight
         correct += (outputs.argmax(1) == labels).sum().item()
         seen += len(labels)
-    return total_loss / seen, correct / seen
+    return total_loss / total_weight, correct / seen
 
 
 @torch.no_grad()
-def predict(model, loader, device):
-    """Class probabilities (N, 2), true labels (N,) and mean cross-entropy over a loader."""
+def predict(model, loader, device, weight=None):
+    """Class probabilities (N, 2), true labels (N,) and the (weighted) cross-entropy over a loader."""
     model.eval()
-    probs, labels_all, total_loss = [], [], 0.0
+    weight = None if weight is None else weight.to(device)
+    probs, labels_all, total_loss, total_weight = [], [], 0.0, 0.0
     for images, labels in loader:
         logits = model(images.to(device, non_blocking=True))
-        total_loss += nn.functional.cross_entropy(logits, labels.to(device), reduction="sum").item()
+        labels = labels.to(device)
+        total_loss += nn.functional.cross_entropy(logits, labels, weight=weight, reduction="sum").item()
+        total_weight += len(labels) if weight is None else weight[labels].sum().item()
         probs.append(logits.softmax(1).cpu())
-        labels_all.append(labels)
-    labels_all = torch.cat(labels_all).numpy()
-    return torch.cat(probs).numpy(), labels_all, total_loss / len(labels_all)
+        labels_all.append(labels.cpu())
+    return torch.cat(probs).numpy(), torch.cat(labels_all).numpy(), total_loss / total_weight
 
 
 def fit(model, train_loader, val_loader, device, epochs=15, lr=1e-3, weight_decay=1e-4, keep_best=False, tag=""):
     """Train with AdamW and a cosine learning-rate schedule, evaluating on `val_loader` after every epoch.
 
+    The loss is weighted by `class_weights` of the training images, on the training and on the
+    validation data, so that the two loss curves are comparable.
     keep_best=True restores the weights of the epoch with the best validation accuracy.
     Returns the history (train and validation loss/accuracy per epoch) and the kept epoch.
     """
+    train_data = train_loader.dataset
+    weight = class_weights(train_data.labels[train_data.indices])
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     history = {k: [] for k in ("train_loss", "train_acc", "val_loss", "val_acc", "val_f1", "seconds")}
     best_acc, best_epoch, best_state = -1.0, epochs, None
     for epoch in range(1, epochs + 1):
         start = time.time()
-        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device)
-        probs, y, val_loss = predict(model, val_loader, device)
+        train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, device, weight)
+        probs, y, val_loss = predict(model, val_loader, device, weight)
         val = compute_metrics(y, probs)
         scheduler.step()
         for key, value in zip(history, (train_loss, train_acc, val_loss, val["accuracy"], val["f1"], time.time() - start)):
@@ -162,12 +181,8 @@ def train_final(name, train_set, val_set, device, epochs=15, batch_size=32, lr=1
     return model.eval(), info
 
 
-def evaluate_test(model, test_set, device, leaked=None, batch_size=64):
-    """Test metrics, 95% bootstrap interval of the accuracy, confusion matrix and predictions.
-
-    `leaked` marks test images with a near-duplicate in the training split; the metrics on the
-    others ('clean' test images) show how much those copies inflate the test score.
-    """
+def evaluate_test(model, test_set, device, batch_size=64):
+    """Test metrics, 95% bootstrap interval of the accuracy, confusion matrix and predictions."""
     loader = make_loader(test_set, batch_size=batch_size)
     start = time.time()
     probs, y, _ = predict(model, loader, device)
@@ -178,9 +193,6 @@ def evaluate_test(model, test_set, device, leaked=None, batch_size=64):
               "confusion_matrix": confusion_matrix(y, y_pred, labels=[0, 1]).tolist(),
               "y_true": y.tolist(), "y_pred": y_pred.tolist(), "prob_positive": probs[:, POSITIVE].tolist(),
               "ms_per_image": ms_per_image}
-    if leaked is not None and (~leaked).any():
-        result["clean"] = compute_metrics(y[~leaked], probs[~leaked])
-        result["n_clean"] = int((~leaked).sum())
     return result
 
 
@@ -228,8 +240,6 @@ def test_table(test):
         lo, hi = r["accuracy_ci"]
         rows[name] = {"accuracy": f"{100 * r['accuracy']:.1f} [{100 * lo:.1f}, {100 * hi:.1f}]",
                       **{m: round(100 * r[m], 1) for m in METRICS[1:]}}
-        if "clean" in r:
-            rows[name][f"accuracy on clean test ({r['n_clean']})"] = round(100 * r["clean"]["accuracy"], 1)
     return pd.DataFrame(rows).T
 
 

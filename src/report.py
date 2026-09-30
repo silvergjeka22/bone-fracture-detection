@@ -21,11 +21,13 @@ MACRO_METHOD = {"Saliency": "Sal", "Integrated Gradients": "IG", "Guided Backpro
 MODEL_LABELS = {"cnn": "CNN", "scatnet": "ScatNet", "resnet18": "ResNet18"}
 
 
-def build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar, xai_results, settings):
+def build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar, xai_results, settings,
+                  localization=None):
     """All results in one JSON-friendly dict.
 
     xai_results: {model: {"deletion": DataFrame, "seconds": {method: s}}} plus optionally
     "scratch_vs_captum": DataFrame (one row per model).
+    localization: {model: DataFrame from localize.localization_table}.
     """
     summary = {
         "settings": settings,
@@ -40,7 +42,6 @@ def build_summary(data_table, duplicate_table, cv, final, test, best, select_by,
             "cv_mean": cv[name]["mean"], "cv_std": cv[name]["std"],
             "test": {k: t[k] for k in ("accuracy", "f1", "precision", "recall", "specificity", "auc")},
             "test_accuracy_ci": t["accuracy_ci"], "confusion_matrix": t["confusion_matrix"],
-            "test_clean": t.get("clean"), "n_clean": t.get("n_clean"),
             "parameters": final[name]["parameters"], "best_epoch": final[name]["best_epoch"],
             "seconds_per_epoch": final[name]["seconds_per_epoch"], "ms_per_image": t["ms_per_image"],
         }
@@ -50,6 +51,9 @@ def build_summary(data_table, duplicate_table, cv, final, test, best, select_by,
             continue
         summary["xai"][name] = {"deletion_auc": r["deletion"]["deletion AUC (mean)"].to_dict(),
                                 "seconds_per_image": r["seconds"]}
+    if localization:
+        summary["localization"] = {name: json.loads(table.to_json(orient="index"))
+                                   for name, table in localization.items()}
     return summary
 
 
@@ -80,15 +84,13 @@ def latex_macros(summary):
     add("SelectBy", {"f1": "F1", "accuracy": "accuracy"}.get(summary["select_by"], summary["select_by"]))
     for split, row in summary["dataset"].items():
         add(f"N{split.capitalize()}", f"{int(row['total']):,}".replace(",", "{,}"))
-    dup = summary["duplicates"]
-    if "train" in dup:
-        add("DupTrain", int(dup["train"]["with a near-duplicate in train"]))
-        add("DupTrainPct", dup["train"]["%"])
-        add("DupGroups", int(dup["train"]["duplicate groups"]))
-    for split in ("val", "test"):
-        if split in dup:
-            add(f"Dup{split.capitalize()}", int(dup[split]["with a near-duplicate in train"]))
-            add(f"Dup{split.capitalize()}Pct", dup[split]["%"])
+    if "fractured" in summary["dataset"].get("test", {}):
+        add("NTestFractured", int(summary["dataset"]["test"]["fractured"]))
+    dup = summary["duplicates"].get("dataset")
+    if dup:
+        add("DupImages", int(dup["with a near-duplicate"]))
+        add("DupPct", dup["%"])
+        add("DupGroups", int(dup["duplicate groups"]))
     for name, m in summary["models"].items():
         tag = MACRO_MODEL.get(name, re.sub(r"[^A-Za-z]", "", name))
         add(f"CVAcc{tag}", f"{_pct(m['cv_mean']['accuracy'])} $\\pm$ {_pct(m['cv_std']['accuracy'])}")
@@ -98,7 +100,6 @@ def latex_macros(summary):
         add(f"TestFone{tag}", _pct(m["test"]["f1"]))
         add(f"TestRecall{tag}", _pct(m["test"]["recall"]))
         add(f"TestAUC{tag}", _pct(m["test"]["auc"]))
-        add(f"CleanAcc{tag}", _pct((m["test_clean"] or {}).get("accuracy")))
         add(f"Params{tag}", f"{m['parameters'] / 1e6:.1f}M")
         add(f"SecEpoch{tag}", f"{m['seconds_per_epoch']:.0f}")
     for name, x in summary["xai"].items():
@@ -115,6 +116,18 @@ def latex_macros(summary):
         corr = min(v["min Pearson r"] for v in summary["scratch_vs_captum"].values())
         add("ScratchMaxDiff", f"{worst:.1e}")
         add("ScratchMinCorr", f"{corr:.4f}")
+    localization = summary.get("localization", {})
+    for name, rows in localization.items():
+        tag = MACRO_MODEL.get(name, re.sub(r"[^A-Za-z]", "", name))
+        methods = {k: v for k, v in rows.items() if k != "Random"}
+        best = max(methods, key=lambda k: methods[k]["hit rate (%)"]) if methods else None
+        add(f"BestBox{tag}", best or "--")
+        add(f"BestHit{tag}", f"{methods[best]['hit rate (%)']:.0f}" if best else "--")
+        for method, row in methods.items():
+            add(f"Hit{tag}{MACRO_METHOD.get(method, re.sub(r'[^A-Za-z]', '', method))}", f"{row['hit rate (%)']:.0f}")
+    random = [rows["Random"]["hit rate (%)"] for rows in localization.values() if "Random" in rows]
+    if random:  # the same fractured test X-rays for every model
+        add("HitRandom", f"{random[0]:.0f}")
     return "\n".join(lines) + "\n"
 
 
@@ -153,9 +166,8 @@ def key_findings(summary):
     best = summary["best_model"]
     lines = [f"Best model (highest CV {summary['select_by']}): {MODEL_LABELS.get(best, best)}"]
     for name, m in models.items():
-        clean = m["test_clean"]["accuracy"] if m.get("test_clean") else float("nan")
         lines.append(f"  {MODEL_LABELS.get(name, name):9s} CV acc {_pct(m['cv_mean']['accuracy'])}% | "
-                     f"test acc {_pct(m['test']['accuracy'])}% (clean {_pct(clean)}%) | "
+                     f"test acc {_pct(m['test']['accuracy'])}% | "
                      f"test F1 {_pct(m['test']['f1'])}% | AUC {_pct(m['test']['auc'])}% | "
                      f"{'meets' if m['test']['accuracy'] >= 0.75 else 'BELOW'} the 75% target")
     for pair, row in summary["mcnemar"].items():
@@ -167,26 +179,33 @@ def key_findings(summary):
     if "scratch_vs_captum" in summary:
         worst = max(v["max |difference|"] for v in summary["scratch_vs_captum"].values())
         lines.append(f"  Occlusion from scratch vs Captum: max |difference| = {worst:.1e}")
+    for name, rows in summary.get("localization", {}).items():
+        lines.append(f"  fracture found (pointing game) on {MODEL_LABELS.get(name, name)}: "
+                     + ", ".join(f"{k} {v['hit rate (%)']:.0f}%" for k, v in rows.items()))
     text = "\n".join(lines)
     print(text)
     return text
 
 
 def export(results_dir, settings, data_table, duplicate_table, cv, final, test, best, select_by, mcnemar,
-           deletion, seconds, scratch_table, comparison):
+           deletion, seconds, scratch_table, comparison, localization=None):
     """Build and save summary.json and the LaTeX macros/tables of the slides; returns the summary."""
     from .training import cv_table, test_table
 
     xai_results = {n: {"deletion": deletion[n], "seconds": seconds[n]} for n in deletion}
     xai_results["scratch_vs_captum"] = scratch_table
     summary = build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar,
-                            xai_results, settings)
+                            xai_results, settings, localization)
     save_summary(summary, results_dir)
-    export_latex(summary, {
+    tables = {
         "dataset": data_table, "duplicates": duplicate_table, "cv": cv_table(cv), "test": test_table(test),
         "mcnemar": mcnemar,
         "deletion": pd.DataFrame({MODEL_LABELS.get(n, n): d["deletion AUC (mean)"] for n, d in deletion.items()}),
         "comparison": comparison[["parameters (M)", "s / epoch", "ms / image"]].round(1),
-    }, results_dir)
+    }
+    if localization:  # hit rates in %, as whole numbers
+        hits = pd.DataFrame({MODEL_LABELS.get(n, n): t["hit rate (%)"] for n, t in localization.items()})
+        tables["localization"] = hits.apply(lambda col: col.map(lambda v: "--" if pd.isna(v) else f"{v:.0f}"))
+    export_latex(summary, tables, results_dir)
     print(f"saved {Path(results_dir) / 'summary.json'} and {Path(results_dir) / 'latex'}")
     return summary

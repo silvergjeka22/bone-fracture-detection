@@ -24,6 +24,13 @@ def test_bootstrap_ci_contains_accuracy():
     assert lo <= 0.8 <= hi and 0 <= lo < hi <= 1
 
 
+def test_class_weights():
+    assert training.class_weights([0, 1, 0, 1]).tolist() == [1.0, 1.0]
+    w = training.class_weights([0] + [1] * 5)  # 1 fractured X-ray in 6, like FracAtlas
+    assert w.tolist() == pytest.approx([3.0, 0.6])
+    assert w[0] * 1 == pytest.approx(w[1] * 5)  # both classes weigh the same in the loss
+
+
 def test_mcnemar():
     y = np.zeros(20, int)
     a = np.zeros(20, int)
@@ -47,9 +54,9 @@ def test_model_can_overfit_a_small_batch(sets):
     assert (probs.argmax(1) == y).all() and loss < 0.1
 
 
-def test_cross_validation_groups_never_split(sets, tmp_path, monkeypatch):
+def test_cross_validation_groups_never_split(sets, dup, split, tmp_path, monkeypatch):
     """Copies of one X-ray (same group) must stay in the same fold."""
-    groups = data.study_duplicates(sets)["groups"]
+    groups = dup["groups"][split["train"]]
     seen = []
     original = training.make_loader
 
@@ -79,10 +86,7 @@ def test_train_final_save_load_and_test(sets, tmp_path):
     x, _ = sets["test"].tensors([0, 1])
     with torch.no_grad():
         assert torch.allclose(model(x), loaded(x), atol=1e-5)
-    leaked = np.zeros(len(sets["test"]), bool)
-    leaked[0] = True
-    result = training.evaluate_test(loaded, sets["test"], "cpu", leaked=leaked)
-    assert result["n_clean"] == len(sets["test"]) - 1
+    result = training.evaluate_test(loaded, sets["test"], "cpu")
     assert np.array(result["confusion_matrix"]).sum() == len(sets["test"])
     assert len(result["y_pred"]) == len(sets["test"])
 

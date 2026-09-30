@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.slow
 def test_notebook_runs_end_to_end(tmp_path):
-    data_dir = make_dataset(tmp_path / "data", per_class=(16, 5, 5))
+    data_dir = make_dataset(tmp_path / "data", per_class=30)
     results = tmp_path / "results"
     torch_home = tmp_path / "torch"
     url = torchvision.models.ResNet18_Weights.IMAGENET1K_V1.url
@@ -51,8 +51,10 @@ def test_notebook_runs_end_to_end(tmp_path):
     summary = json.loads((results / "summary.json").read_text())
     assert set(summary["models"]) == {"cnn", "scatnet", "resnet18"}
     assert summary["best_model"] in summary["models"]
-    for figure in ("dataset_overview", "learning_curves", "confusion_matrices", "filters_cnn", "filters_scatnet",
-                   "xai_cnn", "xai_scatnet", "occlusion_scratch_vs_captum", "deletion_curves", "xai_agreement"):
+    for figure in ("dataset_overview", "samples_train", "duplicates", "learning_curves", "confusion_matrices",
+                   "filters_cnn", "filters_scatnet", "xai_cnn", "xai_scatnet", "occlusion_scratch_vs_captum",
+                   "deletion_curves", "xai_agreement", "boxes_cnn", "boxes_scatnet", "localization"):
         assert (results / "figures" / f"{figure}.png").exists(), figure
     assert (results / "latex" / "numbers.tex").exists()
     assert max(v["max |difference|"] for v in summary["scratch_vs_captum"].values()) < 1e-4
+    assert {"cnn", "scatnet"} <= set(summary["localization"]) and "Random" in summary["localization"]["cnn"]

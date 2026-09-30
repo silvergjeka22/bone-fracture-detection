@@ -19,7 +19,7 @@ and exits 1 if one fails. Then walk through the manual items below.
 
 | # | requirement | where | auto |
 |---|---|---|---|
-| 2 | binary dataset chosen by us | Kaggle Bone Fracture Multi-Region X-ray; `data.py` | yes |
+| 2 | binary dataset chosen by us | FracAtlas (with radiologists' fracture boxes); `data.py` | yes |
 | 3 | train / test split | train / val / test folders; test used once (`training.evaluate_test`) | yes |
 | 4 | CNN and ScatNet, **same final classifier** except input neurons | `models.Classifier`, `models.classifier_layout`, test `test_same_classifier_for_every_model` | yes |
 | 5 | k-fold CV on the training set: **mean accuracy and mean F1** | `training.cross_validate` -> `results/cv/*.json` | yes |

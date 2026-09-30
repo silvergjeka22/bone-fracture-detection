@@ -1,4 +1,4 @@
-"""Shared fixtures: a tiny synthetic dataset and small models (64x64 images, CPU)."""
+"""Shared fixtures: a tiny synthetic FracAtlas and its split (64x64 images, CPU)."""
 
 import numpy as np
 import pytest
@@ -12,12 +12,27 @@ SIZE = 64  # small images keep the tests fast; every model and method must work 
 
 @pytest.fixture(scope="session")
 def data_dir(tmp_path_factory):
-    return make_dataset(tmp_path_factory.mktemp("xrays"), per_class=(12, 4, 4), seed=0)
+    return make_dataset(tmp_path_factory.mktemp("fracatlas"), per_class=16, seed=0)
 
 
 @pytest.fixture(scope="session")
-def sets(data_dir):
-    return data.load_splits(data_dir, size=SIZE)
+def dataset(data_dir):
+    return data.load_dataset(data_dir, size=SIZE)
+
+
+@pytest.fixture(scope="session")
+def dup(dataset):
+    return data.study_duplicates(dataset)
+
+
+@pytest.fixture(scope="session")
+def split(dataset, dup):
+    return data.split_indices(dataset.labels, dup["groups"], seed=0)
+
+
+@pytest.fixture(scope="session")
+def sets(dataset, split):
+    return {name: dataset.subset(idx) for name, idx in split.items()}
 
 
 @pytest.fixture

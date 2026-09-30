@@ -7,16 +7,14 @@
 \providecommand{\SelectBy}{F1}
 \providecommand{\Epochs}{20}
 \providecommand{\KFolds}{5}
-\providecommand{\NTrain}{9{,}246}
-\providecommand{\NVal}{829}
-\providecommand{\NTest}{506}
-\providecommand{\DupTrain}{\na}
-\providecommand{\DupTrainPct}{\na}
+\providecommand{\NTrain}{\na}
+\providecommand{\NVal}{\na}
+\providecommand{\NTest}{\na}
+\providecommand{\NTestFractured}{\na}
+\providecommand{\DupImages}{\na}
+\providecommand{\DupPct}{\na}
 \providecommand{\DupGroups}{\na}
-\providecommand{\DupVal}{\na}
-\providecommand{\DupValPct}{\na}
-\providecommand{\DupTest}{\na}
-\providecommand{\DupTestPct}{\na}
+\providecommand{\HitRandom}{\na}
 \providecommand{\ScratchMaxDiff}{\na}
 \providecommand{\McNemarCNNvsScat}{\na}
 \providecommand{\McNemarCNNvsRes}{\na}
@@ -30,10 +28,11 @@
   \expandafter\providecommand\csname TestFone#1\endcsname{\na}%
   \expandafter\providecommand\csname TestRecall#1\endcsname{\na}%
   \expandafter\providecommand\csname TestAUC#1\endcsname{\na}%
-  \expandafter\providecommand\csname CleanAcc#1\endcsname{\na}%
   \expandafter\providecommand\csname Params#1\endcsname{\na}%
   \expandafter\providecommand\csname SecEpoch#1\endcsname{\na}%
-  \expandafter\providecommand\csname BestXAI#1\endcsname{\na}}
+  \expandafter\providecommand\csname BestXAI#1\endcsname{\na}%
+  \expandafter\providecommand\csname BestBox#1\endcsname{\na}%
+  \expandafter\providecommand\csname BestHit#1\endcsname{\na}}
 \providecommand{\ParamsCNN}{26.1M}
 \providecommand{\ParamsScat}{41.9M}
 \providecommand{\ParamsRes}{11.5M}

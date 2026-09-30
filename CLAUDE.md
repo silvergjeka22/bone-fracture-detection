@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-Exam project (Visual Intelligence, UniVR 2025/26): bone X-ray fracture classification, CNN vs ScatNet
-(+ ResNet18), six XAI methods, one (Occlusion) from scratch. The exam PDF's requirements are listed in
+Exam project (Visual Intelligence, UniVR 2025/26): bone X-ray fracture classification on FracAtlas, CNN vs
+ScatNet (+ ResNet18), six XAI methods, one (Occlusion) from scratch, and XAI maps turned into fracture boxes
+scored against the radiologists' boxes (`localize.py`). The exam PDF's requirements are listed in
 `.claude/skills/exam-checklist/SKILL.md`.
 
 ## Layout and rules
@@ -11,7 +12,9 @@ Exam project (Visual Intelligence, UniVR 2025/26): bone X-ray fracture classific
 - Every model ends with `models.Classifier` (exam: same classifier, only `in_features` differs).
   Keep it that way; `tests/test_models.py` enforces it.
 - Images are grey, 1 channel, normalised to [-1, 1]; black = `data.BLACK` = -1 is the XAI baseline.
-- F1 / precision / recall are for class 0 = `fractured` (`training.POSITIVE`).
+- F1 / precision / recall are for class 0 = `fractured` (`training.POSITIVE`). Classes are unbalanced
+  (1 in 6 fractured): the loss is weighted (`training.class_weights`).
+- Fracture boxes are `(x0, y0, x1, y1)` in pixels of the 224x224 image (`ImageSet.boxes`, from the YOLO files).
 - Figures: one function per figure in `plots.py`, fixed colours (`MODEL_COLORS`, `METHOD_COLORS`),
   always `save_to=FIG_DIR / "<name>.png"`; the slides include them by that name.
 - Numbers in the slides come only from `results/latex/numbers.tex` (`report.latex_macros`); add a
@@ -28,5 +31,5 @@ make -C presentation                  # slides from results/
 python .claude/skills/exam-checklist/scripts/check_exam.py
 ```
 
-The real dataset is only on Kaggle (`bmadushanirodrigo/fracture-multi-region-x-ray-data`); a cloud
+The real dataset is only on Kaggle (`mahmudulhasantasin/fracatlas-original-dataset`); a cloud
 sandbox may not reach kaggle.com, so training happens on the Kaggle kernel (`kaggle-run` skill).

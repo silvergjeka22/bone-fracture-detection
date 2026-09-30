@@ -39,8 +39,8 @@ Check the output: `pdftoppm -r 60 -png presentation/main.pdf /tmp/s` and look at
 
 ## Time budget
 
-The exam limit is 12 minutes (15 for a pair). The deck has ~17 main slides + backups; the
-timing is in `presentation/SPEAKER_NOTES.md` (~40 s per slide). If it runs long, cut slide 18
-(agreement) and merge 13-14 (XAI grids) before cutting content the exam asks for (filters,
+The exam limit is 12 minutes (15 for a pair). The deck has ~18 main slides + backups; the
+timing is in `presentation/SPEAKER_NOTES.md` (~40 s per slide). The agreement slide is already a
+backup; if it still runs long, merge 13-14 (XAI grids) before cutting content the exam asks for (filters,
 CV mean accuracy/F1, test >= 75%, XAI on both models, scratch vs Captum, discussion).
-After a new run, re-read slides 10 and 19: their reasoning must match the new numbers.
+After a new run, re-read slides 10, 17-18 (boxes) and 19: their reasoning must match the new numbers.

@@ -45,7 +45,7 @@ def main():
         s = json.loads(summary_path.read_text())
         quick = s.get("settings", {}).get("quick")
         check("full run (not QUICK)", not quick)
-        check("2. binary dataset", all(len([k for k in row if k not in ("total", "median width (px)",
+        check("2. binary dataset", all(len([k for k in row if k not in ("total", "fracture boxes", "median width (px)",
               "median height (px)", "mean intensity") and not k.startswith("%")]) == 2 for row in s["dataset"].values()))
         check("3. separate test split", "test" in s["dataset"] and "train" in s["dataset"])
         for name in ("cnn", "scatnet"):
