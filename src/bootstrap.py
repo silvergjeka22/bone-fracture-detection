@@ -5,7 +5,7 @@ On Kaggle (see kernel-metadata.json and run.sh):
   - /kaggle/working is the only folder saved as the kernel's output, so results go there
     (/kaggle/working/results) and the image cache goes to /tmp (it is rebuilt in ~1 minute
     and would only bloat the download);
-  - torch, numpy, sklearn, matplotlib are preinstalled: only kymatio and captum are added.
+  - torch, numpy, sklearn, matplotlib are preinstalled: only kymatio, captum and ultralytics (YOLO) are added.
 """
 
 import importlib.util
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = {"kymatio": "kymatio>=0.3", "captum": "captum>=0.7"}
+PACKAGES = {"kymatio": "kymatio>=0.3", "captum": "captum>=0.7", "ultralytics": "ultralytics>=8.3"}
 
 
 def environment():

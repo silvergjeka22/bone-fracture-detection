@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from src import localize
@@ -60,3 +61,27 @@ def test_box_lands_on_the_synthetic_crack(dataset):
     m[y0:y1, x0:x1] = 1.0
     box = localize.heatmap_to_box(m)
     assert localize.iou(box, dataset.boxes[i]) > 0.5 and localize.pointing_game(m, dataset.boxes[i])
+
+
+def test_score_boxes_uses_the_most_confident_box():
+    truth = [np.array([[10, 10, 20, 20]], dtype=float)] * 3
+    boxes = [np.array([[12, 12, 18, 18, 0.9], [40, 40, 50, 50, 0.5]]),   # centre inside: hit
+             np.array([[40, 40, 50, 50, 0.9]]),                          # centre outside: miss
+             np.zeros((0, 5))]                                           # nothing found: miss
+    scores = localize.score_boxes(boxes, truth, (S, S))
+    assert scores["hit rate (%)"] == pytest.approx(100 / 3, abs=0.1)
+    assert scores["IoU"] == pytest.approx(36 / 100 / 3, abs=1e-3)
+
+
+def test_choose_method_prefers_faithful_methods():
+    localization = pd.DataFrame({"hit rate (%)": {"LIME": 70.0, "Occlusion": 60.0, "Random": 5.0}})
+    deletion = pd.DataFrame({"deletion AUC (mean)": {"LIME": 0.8, "Occlusion": 0.3, "Random": 0.6}})
+    assert localize.choose_method(localization, deletion) == "Occlusion"  # LIME hits more but is not faithful
+    deletion.loc["Occlusion", "deletion AUC (mean)"] = 0.9                # nobody beats Random: most hits wins
+    assert localize.choose_method(localization, deletion) == "LIME"
+
+
+def test_detector_vs_xai():
+    table = pd.DataFrame({"hit rate (%)": {"Occlusion": 60.0, "Random": 5.0}, "IoU": {"Occlusion": 0.2, "Random": np.nan}})
+    out = localize.detector_vs_xai({"cnn": table}, {"hit rate (%)": 80.0, "IoU": 0.4}, {"cnn": "CNN"})
+    assert list(out.index) == ["YOLO (trained on boxes)", "CNN: Occlusion", "Random point"]

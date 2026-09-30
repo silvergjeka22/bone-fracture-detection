@@ -44,7 +44,7 @@
 }
 
 \title{Bone Fracture Detection in X-rays}
-\subtitle{A learned CNN vs a wavelet Scattering Network, explained with six XAI methods and fracture boxes}
+\subtitle{A learned CNN vs a wavelet Scattering Network, six XAI methods, fracture boxes and a YOLO pipeline}
 \author{Visual Intelligence project}
 \institute{MSc in Artificial Intelligence \textbullet{} University of Verona \textbullet{} 2025/2026}
 \date{}
@@ -71,7 +71,7 @@
   \item Do the explanations point at the fracture?
 \end{enumerate}
 \medskip
-\small PyTorch \textbullet{} Kymatio \textbullet{} Captum \textbullet{} runs on a Kaggle GPU
+\small PyTorch \textbullet{} Kymatio \textbullet{} Captum \textbullet{} YOLOv8 \textbullet{} Kaggle GPU
 \end{column}
 \begin{column}{0.51\textwidth}
 \resultfig{samples_train}
@@ -206,7 +206,7 @@ $1 + JL + L^2\tfrac{J(J-1)}{2} = 1+32+384 = \mathbf{417}$ maps of $\tfrac{224}{2
   \node[blk=cnn, right=of cv, text width=2.9cm] (sel) {mean acc, mean F1\\\textbf{best model} by CV \SelectBy};
   \node[blk=scat, below=6mm of cv, text width=3.5cm] (fin) {final training on all of train\\val (\NVal) picks the epoch};
   \node[blk=scat, right=of fin, text width=2.9cm] (te) {\textbf{test} (\NTest), once\\accuracy + 95\% CI, McNemar};
-  \node[blk=head, right=of te, text width=2.4cm] (xai) {filters\\6 XAI methods\\deletion test\\fracture boxes};
+  \node[blk=head, right=of te, text width=2.4cm] (xai) {filters\\6 XAI methods\\deletion test\\fracture boxes\\YOLO pipeline};
   \draw[arr] (tr) -- (cv); \draw[arr] (cv) -- (sel);
   \draw[arr] (tr) |- (fin); \draw[arr] (fin) -- (te); \draw[arr] (te) -- (xai); \draw[arr] (sel) -| (xai);
 \end{tikzpicture}
@@ -413,12 +413,33 @@ Evidence outside our box stays visible (faint): a model looking at a label or a 
 \resulttable[0.95\linewidth]{localization}
 
 \medskip
-Best: CNN \BestBoxCNN{} (\BestHitCNN\%), ScatNet \BestBoxScat{} (\BestHitScat\%); a random point: \HitRandom\%.
+Best: CNN \BestBoxCNN{} (\BestHitCNN\%), ScatNet \BestBoxScat{} (\BestHitScat\%); YOLO, trained on the boxes: \YoloHit\%; a random point: \HitRandom\%.
 \end{column}
 \end{columns}
 \end{frame}
 
-% ================================================================ 19
+% ================================================================ 20
+\begin{frame}{The full pipeline (after Linda, 2025)}
+\begin{columns}[T]
+\begin{column}{0.34\textwidth}
+\small
+For every test X-ray:
+\begin{enumerate}
+  \item \textbf{YOLOv8} draws the fracture box\\
+        {\footnotesize mAP@0.5 \YoloMapFifty\% (FracAtlas paper: 56.2\%)}
+  \item the best classifier (\BestModel) says fractured or not
+  \item the best XAI method (\BoxMethod) explains it: inside YOLO's box in \AgreePct\% of cases
+  \item \textbf{verdict}: fracture / no fracture if they agree, otherwise \alert{needs review}
+\end{enumerate}
+{\footnotesize Needs review: \ReviewPct\% \textbullet{} correct when it decides: \DecidedAcc\% \textbullet{} fractures missed: \MissedPct\%}
+\end{column}
+\begin{column}{0.64\textwidth}
+\resultfig{pipeline_examples}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ================================================================ 21
 \section{Conclusions}
 \begin{frame}{Discussion and conclusions}
 \small
@@ -432,7 +453,8 @@ Best: CNN \BestBoxCNN{} (\BestHitCNN\%), ScatNet \BestBoxScat{} (\BestHitScat\%)
         gradients are sharp but noisy; Integrated Gradients is the best compromise.
         Grad-CAM does not apply to ScatNet; Guided Backprop only partly.
   \item \textbf{Our Occlusion} = Captum's up to floating-point error.
-  \item \textbf{Boxes}: the best map hits the radiologist's box in \BestHitCNN\% (CNN) / \BestHitScat\% (ScatNet) of fractured X-rays; a random point \HitRandom\%.
+  \item \textbf{Boxes}: the best map hits the radiologist's box in \BestHitCNN\% (CNN) / \BestHitScat\% (ScatNet) of fractured X-rays; YOLO \YoloHit\%, a random point \HitRandom\%.
+  \item \textbf{Pipeline}: classifier + YOLO + XAI decide when they agree and send \ReviewPct\% of X-rays to a radiologist.
   \item \textbf{Limits}: rotated duplicates missed; small test set; coarse boxes (16-px patches); one baseline, one threshold.
 \end{itemize}
 \end{frame}
@@ -473,7 +495,7 @@ ScatNet & 96.7 & 90.5 \\ \bottomrule
 \begin{frame}{Backup: reproducibility and tests}
 \small
 \begin{itemize}
-  \item \texttt{notebooks/main.ipynb}: settings + calls to \texttt{src/} (data, models, training, xai, localize, plots, report)
+  \item \texttt{notebooks/main.ipynb}: settings + calls to \texttt{src/} (data, models, training, xai, localize, detect, pipeline, plots, report)
   \item Kaggle: \texttt{./run.sh push [--quick]} $\to$ \texttt{status} $\to$ \texttt{get} $\to$ \texttt{slides}; dataset attached through \texttt{kernel-metadata.json}
   \item \texttt{pytest}: data loading and caching, duplicate detection (planted flips/rotations/leaks), identical classifiers,
         every XAI method on every model, Occlusion scratch = Captum, Integrated Gradients completeness,

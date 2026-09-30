@@ -22,12 +22,14 @@ MODEL_LABELS = {"cnn": "CNN", "scatnet": "ScatNet", "resnet18": "ResNet18"}
 
 
 def build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar, xai_results, settings,
-                  localization=None):
+                  localization=None, pipeline=None):
     """All results in one JSON-friendly dict.
 
     xai_results: {model: {"deletion": DataFrame, "seconds": {method: s}}} plus optionally
     "scratch_vs_captum": DataFrame (one row per model).
     localization: {model: DataFrame from localize.localization_table}.
+    pipeline: {"detector": detect.box_metrics, "detector_boxes": localize.score_boxes, "cases": pipeline.scores,
+               "box_method": XAI method used by the pipeline} (dicts of numbers).
     """
     summary = {
         "settings": settings,
@@ -54,6 +56,8 @@ def build_summary(data_table, duplicate_table, cv, final, test, best, select_by,
     if localization:
         summary["localization"] = {name: json.loads(table.to_json(orient="index"))
                                    for name, table in localization.items()}
+    if pipeline:
+        summary["pipeline"] = json.loads(json.dumps(pipeline, default=float))
     return summary
 
 
@@ -128,6 +132,20 @@ def latex_macros(summary):
     random = [rows["Random"]["hit rate (%)"] for rows in localization.values() if "Random" in rows]
     if random:  # the same fractured test X-rays for every model
         add("HitRandom", f"{random[0]:.0f}")
+    pipe = summary.get("pipeline")
+    if pipe:
+        det, boxes, cases = pipe["detector"], pipe["detector_boxes"], pipe["cases"]
+        add("YoloMapFifty", _pct(det["mAP@0.5"]))
+        add("YoloMap", _pct(det["mAP@0.5:0.95"]))
+        add("YoloPrecision", _pct(det["precision"]))
+        add("YoloRecall", _pct(det["recall"]))
+        add("YoloHit", f"{boxes['hit rate (%)']:.0f}")
+        add("YoloIoU", f"{boxes['IoU']:.2f}")
+        add("BoxMethod", pipe["box_method"])
+        for macro, key in (("ReviewPct", "needs review (%)"), ("DecidedAcc", "accuracy when decided (%)"),
+                           ("MissedPct", "fractures missed (%)"), ("AgreePct", "explanation inside the detector box (%)")):
+            value = cases[key]
+            add(macro, "--" if value is None or np.isnan(value) else f"{value:.0f}")
     return "\n".join(lines) + "\n"
 
 
@@ -182,20 +200,27 @@ def key_findings(summary):
     for name, rows in summary.get("localization", {}).items():
         lines.append(f"  fracture found (pointing game) on {MODEL_LABELS.get(name, name)}: "
                      + ", ".join(f"{k} {v['hit rate (%)']:.0f}%" for k, v in rows.items()))
+    pipe = summary.get("pipeline")
+    if pipe:
+        det, cases = pipe["detector"], pipe["cases"]
+        lines.append(f"  YOLO on the fractured test X-rays: mAP@0.5 {_pct(det['mAP@0.5'])}% (FracAtlas paper: 56.2%), "
+                     f"hit rate {pipe['detector_boxes']['hit rate (%)']:.0f}%")
+        lines.append("  full pipeline (" + pipe["box_method"] + "): "
+                     + ", ".join(f"{k} {v:.0f}" for k, v in cases.items()))
     text = "\n".join(lines)
     print(text)
     return text
 
 
 def export(results_dir, settings, data_table, duplicate_table, cv, final, test, best, select_by, mcnemar,
-           deletion, seconds, scratch_table, comparison, localization=None):
+           deletion, seconds, scratch_table, comparison, localization=None, pipeline=None):
     """Build and save summary.json and the LaTeX macros/tables of the slides; returns the summary."""
     from .training import cv_table, test_table
 
     xai_results = {n: {"deletion": deletion[n], "seconds": seconds[n]} for n in deletion}
     xai_results["scratch_vs_captum"] = scratch_table
     summary = build_summary(data_table, duplicate_table, cv, final, test, best, select_by, mcnemar,
-                            xai_results, settings, localization)
+                            xai_results, settings, localization, pipeline)
     save_summary(summary, results_dir)
     tables = {
         "dataset": data_table, "duplicates": duplicate_table, "cv": cv_table(cv), "test": test_table(test),

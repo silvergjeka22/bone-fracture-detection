@@ -1,9 +1,10 @@
 # Kaggle preinstalls torch/torchvision (CUDA-matched), numpy, scipy, pandas, scikit-learn, matplotlib:
-# the notebook only installs kymatio and captum there (src/bootstrap.py). Locally: pip install -r requirements.txt
+# the notebook only installs kymatio, captum and ultralytics there (src/bootstrap.py). Locally: pip install -r requirements.txt
 torch>=2.0
 torchvision>=0.15
 kymatio>=0.3        # wavelet scattering (ScatNet)
 captum>=0.7         # XAI methods
+ultralytics>=8.3    # YOLOv8 detector of the full pipeline
 scikit-learn>=1.3
 scipy>=1.10
 numpy>=1.24

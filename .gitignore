@@ -29,7 +29,9 @@ Bone_Fracture_Binary_Classification/
 # Trained weights and cached attribution maps (large; they come back with ./run.sh get)
 results/models/
 results/attributions/
+results/detector/
 *.pth
+*.pt
 
 # LaTeX build files
 presentation/*.aux

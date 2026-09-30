@@ -21,6 +21,11 @@ def fake_summary():
                                 "Saliency": {"hit rate (%)": 40.0, "IoU": 0.1, "box size (%)": 2.0},
                                 "Random": {"hit rate (%)": 3.2, "IoU": None, "box size (%)": None}}
                          for name in ("cnn", "scatnet")},
+        "pipeline": {"detector": {"mAP@0.5": 0.581, "mAP@0.5:0.95": 0.25, "precision": 0.7, "recall": 0.5},
+                     "detector_boxes": {"hit rate (%)": 71.0, "IoU": 0.34, "box size (%)": 3.0},
+                     "cases": {"needs review (%)": 12.0, "accuracy when decided (%)": 88.0,
+                               "fractures missed (%)": 9.0, "explanation inside the detector box (%)": float("nan")},
+                     "box_method": "Occlusion"},
     }
 
 
@@ -29,7 +34,8 @@ def test_latex_macros():
     for macro in ("\\BestModel}{CNN}", "\\TestAccCNN}{90.0}", "\\TestAccScat}", "\\CVAccCNN}{90.0 $\\pm$ 1.0}",
                   "\\NTrain}{2{,}913}", "\\NTestFractured}{103}", "\\DupImages}{100}", "\\BestXAICNN}{Occlusion}",
                   "\\ScratchMaxDiff}", "\\BestBoxCNN}{Occlusion}", "\\BestHitCNN}{62}", "\\HitCNNSal}{40}",
-                  "\\HitRandom}{3}"):
+                  "\\HitRandom}{3}", "\\YoloMapFifty}{58.1}", "\\YoloHit}{71}", "\\YoloIoU}{0.34}",
+                  "\\BoxMethod}{Occlusion}", "\\ReviewPct}{12}", "\\AgreePct}{--}"):
         assert macro in tex
     lines = tex.strip().splitlines()
     assert all(line.startswith("\\newcommand{\\") for line in lines)
@@ -53,3 +59,4 @@ def test_export_and_key_findings(tmp_path):
     assert (out / "numbers.tex").exists() and (out / "cv.tex").exists()
     text = report.key_findings(summary)
     assert "meets the 75% target" in text and "Occlusion 0.200" in text and "Occlusion 62%" in text
+    assert "YOLO on the fractured test X-rays: mAP@0.5 58.1%" in text

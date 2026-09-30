@@ -1,8 +1,8 @@
 """Run the whole notebook top to bottom on synthetic data (QUICK mode): the proof that it works end to end.
 
-Slow (~3-5 minutes on a CPU): `pytest -m "not slow"` skips it.
-ResNet18's ImageNet weights are replaced by random ones saved in a temporary TORCH_HOME, so the
-test needs no internet.
+Slow (~5-10 minutes on a CPU): `pytest -m "not slow"` skips it.
+ResNet18's ImageNet weights are replaced by random ones saved in a temporary TORCH_HOME, and QUICK mode
+builds YOLO from its .yaml (no pretrained download), so the test needs no internet. It needs `ultralytics`.
 """
 
 import json
@@ -53,8 +53,11 @@ def test_notebook_runs_end_to_end(tmp_path):
     assert summary["best_model"] in summary["models"]
     for figure in ("dataset_overview", "samples_train", "duplicates", "learning_curves", "confusion_matrices",
                    "filters_cnn", "filters_scatnet", "xai_cnn", "xai_scatnet", "occlusion_scratch_vs_captum",
-                   "deletion_curves", "xai_agreement", "boxes_cnn", "boxes_scatnet", "localization"):
+                   "deletion_curves", "xai_agreement", "boxes_cnn", "boxes_scatnet", "localization",
+                   "pipeline_examples"):
         assert (results / "figures" / f"{figure}.png").exists(), figure
     assert (results / "latex" / "numbers.tex").exists()
     assert max(v["max |difference|"] for v in summary["scratch_vs_captum"].values()) < 1e-4
     assert {"cnn", "scatnet"} <= set(summary["localization"]) and "Random" in summary["localization"]["cnn"]
+    assert set(summary["pipeline"]) == {"detector", "detector_boxes", "cases", "box_method"}
+    assert (results / "detector" / "best.pt").exists()

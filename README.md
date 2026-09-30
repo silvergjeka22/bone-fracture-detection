@@ -1,4 +1,4 @@
-# Bone Fracture Detection: CNN vs ScatNet, explained with XAI and fracture boxes
+# Bone Fracture Detection: CNN vs ScatNet, XAI, fracture boxes and a YOLO pipeline
 
 MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
@@ -7,8 +7,10 @@ drew a box around every fracture. A CNN trained from scratch and a wavelet Scatt
 Kymatio) are compared, with an ImageNet-pretrained ResNet18 as a reference; all three end with **the same
 classifier**. The best model is chosen by cross-validation, tested once, its filters are compared with
 ScatNet's wavelets, and the models are explained with **six XAI methods** (Captum), one of which
-(Occlusion) is also implemented from scratch. Finally every explanation is turned into a **fracture box**
-and checked against the radiologists' boxes: do the models look at the fracture?
+(Occlusion) is also implemented from scratch. Every explanation is turned into a **fracture box** and
+checked against the radiologists' boxes: do the models look at the fracture? Finally a **full pipeline**
+after Linda (2025) combines the best classifier, a **YOLOv8 detector** trained on the boxes and the best
+XAI method into a verdict and a short report per X-ray.
 
 Everything runs from one notebook, `notebooks/main.ipynb`, on a **Kaggle GPU** (`./run.sh push`).
 
@@ -26,6 +28,7 @@ Everything runs from one notebook, `notebooks/main.ipynb`, on a **Kaggle GPU** (
 | attributions overlaid, 2 images per class, both models | notebook §7 (`xai_cnn`, `xai_scatnet`) |
 | quality of the attributions, methods that cannot be used | notebook §9 (deletion test, agreement), §10 (boxes), §12 |
 | learning curves train + val in one figure | `learning_curves.png` |
+| (extra) full pipeline after Linda (2025): classifier + YOLOv8 + XAI -> report | `src/detect.py`, `src/pipeline.py`, notebook §11 |
 | presentation | `presentation/main.pdf` (built from `results/`), `presentation/SPEAKER_NOTES.md` |
 
 `python .claude/skills/exam-checklist/scripts/check_exam.py` checks all of this on a finished run.
@@ -50,6 +53,8 @@ bone-fracture-detection/
 │   ├── xai.py                six XAI methods, applicability, deletion test, agreement, scratch vs Captum
 │   ├── occlusion_scratch.py  Occlusion implemented from scratch
 │   ├── localize.py           XAI heatmap -> fracture box; hit rate and IoU against the radiologists' boxes
+│   ├── detect.py             YOLOv8 (Ultralytics) trained on the fracture boxes: train, mAP, predicted boxes
+│   ├── pipeline.py           classifier + YOLO + explanation -> verdict and report per X-ray
 │   ├── plots.py              every figure (fixed colours per model / class / method)
 │   ├── report.py             summary.json + LaTeX macros/tables for the slides
 │   └── utils.py              seed, device, parameter count, Kymatio/SciPy fix
@@ -133,7 +138,7 @@ cd ~/Desktop/bone-fracture-detection
 ./run.sh push --quick --dry-run  # inspect the staged files locally; no Kaggle connection
 ./run.sh push --quick     # 5-minute health check on a small subset (do it once)
 ./run.sh status           # queued / running / complete / error
-./run.sh push             # the full run, ~1-2 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI)
+./run.sh push             # the full run, ~2-3 h on a T4 (5-fold CV x 3 models x 20 epochs + final training + XAI + YOLO)
 ./run.sh get              # download into ./out and copy the results into ./results
 ./run.sh slides           # rebuild presentation/main.pdf with the new numbers
 ./run.sh stop             # print the Kaggle page where a running session can be stopped
@@ -144,7 +149,7 @@ source edits. It records the branch, commit and snapshot checksum in the staged 
 After Kaggle accepts the job, it runs independently and the PC can be switched off. Each download is
 kept in a separate `out/run-<timestamp>/` folder so a failed run cannot erase an earlier result.
 Outputs (in `/kaggle/working/results` on the kernel): `summary.json`, `cv/`, `final/`, `figures/`,
-`latex/`, `models/*.pth`, `attributions/*.npz`.
+`latex/`, `models/*.pth`, `attributions/*.npz`, `detector/best.pt` (YOLO).
 
 Recommended order: run `push --quick`, monitor with `status`, and download with `get`. If that
 health check succeeds, start the full run with `push`. Wait for `Kaggle accepted the job; the PC can
@@ -162,7 +167,7 @@ pip install -r requirements.txt
 jupyter notebook notebooks/main.ipynb
 ```
 Only the **Settings** cell needs editing (`QUICK`, `TRAIN`, `MODELS`, `EPOCHS`, ...). With `TRAIN = False`
-the notebook reloads `results/models/*.pth` and the JSON logs of a previous run and only redraws.
+the notebook reloads `results/models/*.pth`, `results/detector/best.pt` and the JSON logs of a previous run and only redraws.
 Environment variables `BFD_DATA_DIR` / `BFD_RESULTS_DIR` override the paths without editing the notebook.
 
 ## Tests
@@ -173,7 +178,9 @@ pytest -m slow         # the whole notebook on synthetic X-rays (tests/synthetic
 ```
 What they prove without the real data: identical classifiers; every method runs on every model and
 Grad-CAM is refused on ScatNet; our Occlusion equals Captum's (to 1e-5); Integrated Gradients
-satisfies completeness; the deletion test ranks the correct map first; YOLO boxes are read and rescaled;
+satisfies completeness; the deletion test ranks the correct map first; YOLO label files are read and written
+correctly and YOLO's output becomes boxes in our pixels (with a fake `ultralytics`); the pipeline's verdicts
+and reports;
 a map that is hot on a (synthetic) fracture gives a box on it; the split and the folds never separate a
 duplicate group; planted flipped/rotated/brightened copies are found; a model overfits 16 images;
 the notebook runs top to bottom. CI runs both on every push (`.github/workflows/tests.yml`).
@@ -209,6 +216,13 @@ the notebook runs top to bottom. CI runs both on every push (`.github/workflows/
   fractured test X-rays: **hit rate** (pointing game: hottest point inside a radiologist's box, against a
   random point) and **IoU** of the boxes. The figures keep the evidence outside the box visible (faint),
   so a model that also looks at a label or a metal plate is not hidden.
+- **Full pipeline** (after Linda, 2025; `src/detect.py`, `src/pipeline.py`): **YOLOv8s** (COCO-pretrained, as
+  in the FracAtlas paper's baseline, mAP@0.5 = 0.562) is fine-tuned on the fractured X-rays of our training
+  split. For every test X-ray the best classifier decides, YOLO gives the box, the best XAI method (most hits
+  among the methods more faithful than Random) explains, and the verdict is *fracture* / *no fracture* when
+  classifier and detector agree, *needs review* when they disagree. From the paper we leave out the CT scans
+  (FracAtlas has X-rays only) and the graph network (no evidence it helps). YOLO is also scored like the XAI
+  boxes: the level a detector trained *with* boxes reaches.
 
 ## Previous iteration and what changed
 
@@ -227,7 +241,8 @@ dataset without fracture locations, so the explanations could not be checked. Al
 Bruna & Mallat 2013 (scattering networks) · Simonyan et al. 2014 (saliency) · Springenberg et al.
 2015 (guided backprop) · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan
 et al. 2017 (integrated gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion /
-region perturbation) · Zhang et al. 2018 (pointing game) · Abedeen et al. 2023 (FracAtlas, *Scientific
+region perturbation) · Zhang et al. 2018 (pointing game) · Linda 2025 (graph-augmented multi-modal fracture
+detection and reporting, *J. Electrical Systems* 21) · Ultralytics YOLOv8 · Abedeen et al. 2023 (FracAtlas, *Scientific
 Data*) · Captum (captum.ai) · Kymatio (kymat.io).
 
 Course instructors: Prof. Gloria Menegaz, Giorgio Dolci.

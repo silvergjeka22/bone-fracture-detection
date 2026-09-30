@@ -12,6 +12,7 @@ Scores over the fractured test X-rays (FracAtlas has a box around every fracture
     IoU           overlap (intersection / union) of our box with the best-matching radiologist's box
     box size      area of our box, % of the image (a huge box would contain the fracture by luck)
 'Random' is the reference to beat: the chance that a random point lies inside a radiologist's box.
+The detector of the pipeline (YOLO, trained on the boxes) is scored the same way (`score_boxes`).
 """
 
 import numpy as np
@@ -51,15 +52,22 @@ def iou(box, true_boxes):
     return float((inter / union).max())
 
 
+def _inside(x, y, boxes):
+    """Is the point (x, y) inside one of `boxes` (k, >= 4)?"""
+    boxes = np.asarray(boxes, dtype=float)
+    if boxes.size == 0:
+        return False
+    x0, y0, x1, y1 = boxes.reshape(-1, boxes.shape[-1])[:, :4].T
+    return bool(((x0 <= x) & (x <= x1) & (y0 <= y) & (y <= y1)).any())
+
+
 def pointing_game(attribution, true_boxes, smooth=SMOOTH):
     """Does the hottest point of the (positive, smoothed) map lie inside one of `true_boxes`?"""
     heat = evidence(attribution, smooth)
-    if heat.max() <= 0:
+    if heat.max() <= 0 or len(true_boxes) == 0:
         return False
     row, col = np.unravel_index(heat.argmax(), heat.shape)
-    x, y = col + 0.5, row + 0.5  # centre of the pixel, in the coordinates of the boxes
-    x0, y0, x1, y1 = np.asarray(true_boxes, dtype=float).reshape(-1, 4).T
-    return bool(((x0 <= x) & (x <= x1) & (y0 <= y) & (y <= y1)).any())
+    return _inside(col + 0.5, row + 0.5, true_boxes)  # centre of the pixel, in the coordinates of the boxes
 
 
 def box_area_share(true_boxes, shape):
@@ -91,3 +99,35 @@ def localization_table(maps, true_boxes, threshold=THRESHOLD, smooth=SMOOTH):
                       "IoU": np.nan, "box size (%)": np.nan}
     table = pd.DataFrame(rows).T.sort_values("hit rate (%)", ascending=False)
     return table.round({"hit rate (%)": 1, "IoU": 3, "box size (%)": 1})
+
+
+def score_boxes(boxes, true_boxes, shape):
+    """The same scores for predicted boxes (e.g. YOLO's (k, 5) arrays, most confident first): the centre of
+    the most confident box plays the hottest point; an image without a box is a miss."""
+    top = [b[0, :4] if len(b) else None for b in boxes]
+    hits = [b is not None and _inside((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, t) for b, t in zip(top, true_boxes)]
+    area = shape[0] * shape[1]
+    return {"hit rate (%)": round(100 * float(np.mean(hits)), 1),
+            "IoU": round(float(np.mean([iou(b, t) for b, t in zip(top, true_boxes)])), 3),
+            "box size (%)": round(100 * float(np.mean([0.0 if b is None else (b[2] - b[0]) * (b[3] - b[1]) / area
+                                                        for b in top])), 1)}
+
+
+def choose_method(localization, deletion):
+    """XAI method for the pipeline: the most hits among the methods more faithful than Random in the
+    deletion test (among all methods if none beats Random)."""
+    auc = deletion["deletion AUC (mean)"]
+    faithful = [m for m in auc.index if m != "Random" and auc[m] < auc["Random"]]
+    candidates = [m for m in localization.index if m != "Random" and (m in faithful or not faithful)]
+    return max(candidates, key=lambda m: localization.loc[m, "hit rate (%)"])
+
+
+def detector_vs_xai(localization, detector_row, model_labels=None):
+    """One row per box source: the detector, the best XAI method of every model, a random point."""
+    model_labels = model_labels or {}
+    rows = {"YOLO (trained on boxes)": detector_row}
+    for name, table in localization.items():
+        methods = table.drop("Random")
+        rows[f"{model_labels.get(name, name)}: {methods.index[0]}"] = methods.iloc[0].to_dict()
+    rows["Random point"] = next(iter(localization.values())).loc["Random"].to_dict()
+    return pd.DataFrame(rows).T

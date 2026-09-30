@@ -8,6 +8,8 @@ Modules, in the order the notebook (notebooks/main.ipynb) uses them:
     xai                six XAI methods (Captum), deletion test, method agreement
     occlusion_scratch  Occlusion implemented from scratch (compared against Captum)
     localize           XAI heatmap -> fracture box, scored against the radiologists' boxes
+    detect             YOLOv8 trained on the fracture boxes (the detector of the full pipeline)
+    pipeline           classifier + YOLO + explanation -> verdict and report per X-ray (after Linda, 2025)
     plots              every figure
     report             summary.json + LaTeX numbers/tables for the presentation
     utils              seed, device, parameter count

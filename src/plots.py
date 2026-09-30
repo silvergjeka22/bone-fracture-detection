@@ -5,6 +5,7 @@ Colours follow the entity everywhere: one fixed colour per model, per class and 
 Attribution overlays share one colour code: red = evidence for the class, blue = against it.
 """
 
+import textwrap
 from pathlib import Path
 
 import matplotlib as mpl
@@ -30,7 +31,7 @@ CLASS_COLORS = ["#4a3aa7", "#eda100"]  # fractured, not fractured
 METHOD_COLORS = {"Saliency": "#2a78d6", "Integrated Gradients": "#eb6834", "Guided Backprop": "#1baf7a",
                  "Grad-CAM": "#eda100", "Occlusion": "#e87ba4", "LIME": "#008300",
                  "Occlusion (ours)": "#4a3aa7", "Random": NEUTRAL}
-BOX_COLORS = {"radiologist": "#00c2d1", "ours": "#ffd23f"}  # fracture boxes drawn on the X-rays
+BOX_COLORS = {"radiologist": "#00c2d1", "ours": "#ffd23f", "detector": "#ff4fd8"}  # boxes drawn on the X-rays
 DIVERGING = LinearSegmentedColormap.from_list("evidence", ["#1c5cab", "#2a78d6", "#f0efec", "#e34948", "#a8211f"])
 POSITIVE = LinearSegmentedColormap.from_list("for", ["#f0efec", "#e34948", "#a8211f"])  # evidence for the class
 SEQUENTIAL = LinearSegmentedColormap.from_list("blues", ["#f0efec", "#9ec5f4", "#3987e5", "#1c5cab", "#0d366b"])
@@ -64,7 +65,7 @@ def _grid_axes(ax, axis="y"):
 
 
 def _draw_box(ax, box, who):
-    """A fracture box (x0, y0, x1, y1) in pixel coordinates: the radiologist's dashed, ours solid."""
+    """A fracture box (x0, y0, x1, y1) in pixel coordinates: the radiologist's dashed, ours and YOLO's solid."""
     x0, y0, x1, y1 = box
     ax.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), x1 - x0, y1 - y0, fill=False, linewidth=1.6,
                            edgecolor=BOX_COLORS[who], linestyle="--" if who == "radiologist" else "-"))
@@ -473,9 +474,10 @@ def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, t
     _finish(fig, save_to)
 
 
-def plot_localization(tables, save_to=None):
+def plot_localization(tables, detector=None, save_to=None):
     """Pointing game ({model: localization table}): how often the hottest point of each method's map
-    lies inside a radiologist's box. Dashed line = a random point."""
+    lies inside a radiologist's box. Dashed lines: a random point and, if given, the hit rate of the
+    detector trained on the boxes (YOLO)."""
     methods = [m for m in METHOD_COLORS if m not in ("Random", "Occlusion (ours)")
                and any(m in t.index for t in tables.values())]
     random = next(iter(tables.values())).loc["Random", "hit rate (%)"]  # same images for every model
@@ -489,10 +491,46 @@ def plot_localization(tables, save_to=None):
             if np.isnan(v):
                 ax.text(xi, random + 2, "n/a", ha="center", va="bottom", fontsize=7, color=INK_2)
     ax.axhline(random, color=NEUTRAL, linestyle="--", linewidth=1.2, label=f"random point ({random:.0f}%)")
+    if detector is not None:
+        ax.axhline(detector, color=BOX_COLORS["detector"], linestyle="--", linewidth=1.5,
+                   label=f"YOLO, trained on the boxes ({detector:.0f}%)")
     ax.set_xticks(range(len(methods)), [m.replace(" ", "\n") for m in methods])
     ax.set_ylim(0, 100)
     ax.set_ylabel("hottest point inside\nthe radiologist's box (%)")
     ax.set_title("Does the explanation point at the fracture? (fractured test X-rays)")
     _grid_axes(ax)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=len(tables) + 1)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=len(tables) + 1 + (detector is not None))
+    _finish(fig, save_to)
+
+
+def plot_pipeline_examples(image_set, cases, n=4, save_to=None):
+    """A few test X-rays through the full pipeline: radiologist's box (dashed), YOLO's box, the explanation's
+    box, and the report. One example per outcome when possible: found fracture, needs review, healthy, mistake."""
+    kinds = [(cases["true"] == "fractured") & (cases["verdict"] == "fracture"),
+             cases["verdict"] == "needs review",
+             (cases["true"] != "fractured") & (cases["verdict"] == "no fracture"),
+             ((cases["true"] == "fractured") & (cases["verdict"] == "no fracture"))
+             | ((cases["true"] != "fractured") & (cases["verdict"] == "fracture"))]
+    picked = [int(np.flatnonzero(k)[0]) for k in kinds if k.any()]
+    picked += [i for i in range(len(cases)) if i not in picked][:max(0, n - len(picked))]
+    fig, axes = plt.subplots(1, len(picked[:n]), figsize=(3.3 * len(picked[:n]), 4.9), squeeze=False)
+    for ax, i in zip(axes[0], picked[:n]):
+        ax.imshow(image_set.images[i], cmap="gray", vmin=0, vmax=255)
+        ax.axis("off")
+        for box in image_set.boxes[i]:
+            _draw_box(ax, box, "radiologist")
+        for key, who in (("detector box", "detector"), ("xai box", "ours")):
+            if isinstance(cases[key].iloc[i], np.ndarray):
+                _draw_box(ax, cases[key].iloc[i], who)
+        v, fractured = cases["verdict"].iloc[i], cases["true"].iloc[i] == "fractured"
+        outcome = ("" if v == "needs review" else " (correct)" if (v == "fracture") == fractured
+                   else " (missed fracture)" if fractured else " (false alarm)")
+        ax.set_title(v + outcome, fontsize=11, color=INK if outcome == " (correct)" else "#d03b3b")
+        lines = cases["report"].iloc[i].split("\n")[1:]  # without the file-name line
+        ax.text(0.0, -0.03, "\n".join(textwrap.fill(line, 46, subsequent_indent="  ") for line in lines),
+                transform=ax.transAxes, ha="left", va="top", fontsize=7, color=INK_2)
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["detector"], label="YOLO's box"),
+               Line2D([], [], color=BOX_COLORS["ours"], label="explanation's box")]
+    fig.legend(handles=handles, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.02))
     _finish(fig, save_to)

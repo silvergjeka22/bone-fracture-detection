@@ -30,21 +30,22 @@ filled in, attaches only the required local source files, and refuses credential
    the requested Dataset/Notebook permissions. Use `--no-launch-browser` when necessary.
 2. Optional offline preview: `./run.sh push --quick --dry-run` (no authentication or upload).
 3. Health check (~5 min): `./run.sh push --quick` -> `./run.sh status` until `complete` -> `./run.sh get`.
-4. Full run (~1-2 h on a T4, 12 h is the limit): `./run.sh push`. Once accepted, the PC can be switched off.
+4. Full run (~2-3 h on a T4, 12 h is the limit): `./run.sh push`. Once accepted, the PC can be switched off.
 5. `./run.sh get` downloads to a new timestamped folder in `./out` and copies completed `results` into `./results`
-   (`summary.json`, `cv/`, `final/`, `figures/`, `latex/`, `models/*.pth`, `attributions/*.npz`).
+   (`summary.json`, `cv/`, `final/`, `figures/`, `latex/`, `models/*.pth`, `attributions/*.npz`, `detector/best.pt`).
 6. `./run.sh slides` rebuilds `presentation/main.pdf` with the new numbers.
 7. Commit `results/` **without** `models/` and `attributions/` (gitignored, too large), plus the new PDF.
 8. Run the exam checklist skill (`python .claude/skills/exam-checklist/scripts/check_exam.py`).
 
 To re-draw figures without retraining: open the notebook locally (or on Kaggle with the previous
-output attached) with `TRAIN = False`; it reloads `results/models/*.pth` and the JSON logs.
+output attached) with `TRAIN = False`; it reloads `results/models/*.pth`, `results/detector/best.pt` and the JSON logs.
 
 ## Troubleshooting
 
 | symptom | cause / fix |
 |---|---|
 | `No folder with images/Fractured and images/Non_fractured found under /kaggle/input` | FracAtlas not attached: check `dataset_sources`, or add it in the kernel's "Add data" panel |
+| `No module named 'ultralytics'` / `yolov8s.pt` download fails | internet disabled: `enable_internet: true` (bootstrap pip-installs ultralytics, YOLO downloads its COCO weights) |
 | `No YOLO annotation folder` | the attached copy of FracAtlas lacks `Annotations/YOLO`: attach the original release (`mahmudulhasantasin/fracatlas-original-dataset`) |
 | code Dataset rejected / not private | check the Kaggle username in `kernel-metadata.json`; the launcher never submits a kernel until it confirms privacy |
 | upload reaches 100%, then `403 Forbidden` | Kaggle accepted the temporary blob but denied Dataset creation; move legacy `kaggle.json` aside, run `kaggle auth login --force`, and accept Dataset/Notebook permissions |

@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 Exam project (Visual Intelligence, UniVR 2025/26): bone X-ray fracture classification on FracAtlas, CNN vs
-ScatNet (+ ResNet18), six XAI methods, one (Occlusion) from scratch, and XAI maps turned into fracture boxes
-scored against the radiologists' boxes (`localize.py`). The exam PDF's requirements are listed in
+ScatNet (+ ResNet18), six XAI methods, one (Occlusion) from scratch, XAI maps turned into fracture boxes
+scored against the radiologists' boxes (`localize.py`), and a full pipeline after Linda (2025): best classifier
++ YOLOv8 (`detect.py`) + best XAI method -> verdict and report (`pipeline.py`). The exam PDF's requirements are listed in
 `.claude/skills/exam-checklist/SKILL.md`.
 
 ## Layout and rules
@@ -15,6 +16,8 @@ scored against the radiologists' boxes (`localize.py`). The exam PDF's requireme
 - F1 / precision / recall are for class 0 = `fractured` (`training.POSITIVE`). Classes are unbalanced
   (1 in 6 fractured): the loss is weighted (`training.class_weights`).
 - Fracture boxes are `(x0, y0, x1, y1)` in pixels of the 224x224 image (`ImageSet.boxes`, from the YOLO files).
+- `ultralytics` is imported only inside `detect.py` functions; unit tests use a fake `ultralytics`
+  (`tests/test_detect.py`), the notebook test needs the real one (QUICK builds YOLO from `yolov8n.yaml`).
 - Figures: one function per figure in `plots.py`, fixed colours (`MODEL_COLORS`, `METHOD_COLORS`),
   always `save_to=FIG_DIR / "<name>.png"`; the slides include them by that name.
 - Numbers in the slides come only from `results/latex/numbers.tex` (`report.latex_macros`); add a
