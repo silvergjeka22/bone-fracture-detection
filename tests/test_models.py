@@ -46,10 +46,18 @@ def test_gradients_reach_the_input():
         assert x.grad is not None and x.grad.abs().sum() > 0, name
 
 
-def test_guide_layers():
-    assert models.build_model("cnn", SIZE).guide_layer is not None
-    assert models.build_model("resnet18", SIZE, pretrained=False).guide_layer is not None
-    assert getattr(models.build_model("scatnet", SIZE), "guide_layer", None) is None  # no learned conv layer
+def test_joint_model():
+    """Same classifier; classifier, detector and Grad-CAM share layer3; the forward pass equals ResNet18's."""
+    model = models.build_model("joint", SIZE, pretrained=False).eval()
+    x = torch.randn(2, 1, SIZE, SIZE)
+    a = model.grid(x)
+    assert a.shape == (2, 256, SIZE // 16, SIZE // 16) and model.detector(a).shape == (2, 5, SIZE // 16, SIZE // 16)
+    assert type(model.classifier) is models.Classifier and model.cam_layer is model.backbone.layer3
+    assert models.classifier_layout(model) == models.classifier_layout(models.build_model("cnn", SIZE))
+    plain = models.build_model("resnet18", SIZE, pretrained=False).eval()
+    plain.load_state_dict(model.state_dict(), strict=False)
+    with torch.no_grad():
+        assert torch.allclose(model(x), plain(x), atol=1e-5)
 
 
 def test_cam_layers():

@@ -1,13 +1,13 @@
-# Bone Fracture Detection: CNN vs ScatNet, XAI, guided training and a YOLO pipeline
+# Bone Fracture Detection: CNN vs ScatNet, XAI, a joint model and a YOLO pipeline
 
 MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
 X-rays of **FracAtlas** (fractured / not fractured, with the radiologists' fracture boxes). A CNN, a wavelet
 ScatNet and a pretrained ResNet18, all ending with **the same classifier**, are compared and explained with
 **six XAI methods** (Occlusion also written from scratch). The explanations become **fracture boxes**,
-checked against the radiologists' boxes. The best model is then **trained again to look at the fracture**
-(box loss + contrastive loss), and a **full pipeline** after Linda (2025) combines the classifier, a **YOLOv8**
-detector and the best XAI method into a short report per X-ray.
+checked against the radiologists' boxes. **Our method** is one joint model that classifies and finds the box
+(built-in detector), trained together with **XAI inside the loss**; a **full pipeline** after Linda (2025) combines
+it with a **YOLOv8** detector and the best XAI method into a short report per X-ray.
 
 ## Run it on Kaggle (macOS and Windows)
 
@@ -26,7 +26,7 @@ detector and the best XAI method into a short report per X-ray.
 | | macOS, Linux, Windows Git Bash | Windows PowerShell or cmd |
 |---|---|---|
 | quick check (~5 min) | `./run.sh push --quick` | `run.bat push --quick` |
-| full run (~3 h on a T4) | `./run.sh push` | `run.bat push` |
+| full run (~6 h on a T4) | `./run.sh push` | `run.bat push` |
 | is it done? | `./run.sh status` | `run.bat status` |
 | download the results | `./run.sh get` | `run.bat get` |
 
@@ -77,12 +77,12 @@ notebooks/main.ipynb   the experiment: settings + calls to src/
 src/
   bootstrap.py         Kaggle or local setup
   data.py              FracAtlas, fracture boxes, near-duplicates, split, loaders
-  models.py            CNN, ScatNet, ResNet18, one shared Classifier
+  models.py            CNN, ScatNet, ResNet18, JointNet, one shared Classifier
   training.py          grouped k-fold CV, final training, test metrics
   xai.py               six XAI methods, deletion test, agreement
   occlusion_scratch.py Occlusion from scratch
   localize.py          heatmap -> fracture box, hit rate and IoU
-  guidance.py          guided training: box loss + contrastive loss
+  joint.py             our method: classifier + built-in detector + XAI losses
   detect.py            YOLOv8 on the fracture boxes
   pipeline.py          classifier + YOLO + XAI -> verdict and report
   plots.py, report.py  figures, summary.json and the key findings
@@ -99,14 +99,19 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
   `flatten -> 512 -> 128 -> 2`. Best model by cross-validation F1, test set used once.
 - **XAI**: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM (not on ScatNet), Occlusion, LIME;
   black = "removed". Quality: deletion test and hit rate against the radiologists' boxes.
-- **Guided training**: the best model is trained again with
-  `loss = weighted CE + box x Energy loss + contrast x contrastive loss` on the fractured training X-rays:
-  the Energy loss (Rao et al. 2023) is the share of its Grad-CAM heat outside the radiologist's box; the
-  contrastive loss (SupCon, SimCLR-style) makes fracture regions alike and background different. Warm-up first,
-  boxes grown a little, Grad-CAM on the 14x14 layer. Compared with the plain model: accuracy, F1, hit rate of
-  all six XAI methods, deletion test.
+- **Our method, the joint model**: one ResNet18 at 448 px (thin fractures stay visible) with the same classifier
+  and a small built-in detector (CenterNet style) on its layer3 grid, trained together on batches that are half
+  fractured:
+  `loss = CE + detect x detector loss + point x Grad-CAM in the box + agree x agreement + erase x blur test`.
+  *point*: Grad-CAM must put its mass inside the radiologist's box. *agree* (the SimCLR-like part): Grad-CAM must
+  match the detector's map and the map of the mirrored X-ray, and it trains both the classifier and the detector.
+  *erase*: with the fracture blurred the model must say "not fractured", with a random patch blurred it must not
+  change (so the focus is real, not drawn on). XAI losses start after a warm-up; the threshold is chosen on val.
+- **Does XAI help?** A = classifier only (its detector is YOLO), B = classifier + detector, C = B + XAI losses,
+  on the same test X-rays: accuracy, F1, detector AP@0.5, hit rate of all six XAI methods (McNemar A vs C),
+  deletion test, blur test, how often Grad-CAM falls inside the detector's box.
 - **Pipeline** (Linda 2025, without CT and the graph network): YOLOv8s (trained separately on the boxes) gives
-  the box, the classifier decides, the XAI method explains; model and method are chosen on the val split.
+  the box, the best version decides, the XAI method explains; version and method are chosen on the val split.
   If classifier and YOLO disagree, the X-ray *needs review*.
 
 ## Exam requirements -> where
@@ -119,7 +124,7 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
 | filters compared | §6 |
 | six XAI methods, 2 images per class | `src/xai.py`, §7 |
 | one method from scratch vs Captum | `src/occlusion_scratch.py`, §8 |
-| quality of the explanations | §9, §10, §11 |
+| quality of the explanations | §9, §10, §11, §12 |
 
 `python .claude/skills/exam-checklist/scripts/check_exam.py` checks a finished run.
 
@@ -134,7 +139,8 @@ in `docs/previous_run/`. (An old Kaggle key is in the history of branch `xai`: r
 Bruna & Mallat 2013 (scattering) · Simonyan et al. 2014 (saliency) · Springenberg et al. 2015 (guided backprop)
 · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan et al. 2017 (integrated
 gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion test) · Zhang et al. 2018 (pointing
-game) · Ross et al. 2017 (right for the right reasons) · Li et al. 2018 (GAIN) · Rao et al. 2023 (model
-guidance with boxes, Energy loss) · Chen et al. 2020 (SimCLR) · Khosla et al. 2020 (supervised contrastive) ·
-Selvaraju et al. 2021 (CAST) · Abedeen et al. 2023 (FracAtlas, *Scientific Data*) · Linda 2025 (fracture detection
-and reporting, *J. Electrical Systems*) · Captum · Kymatio · Ultralytics YOLOv8.
+game) · Ross et al. 2017 (right for the right reasons) · Li et al. 2018 (GAIN: attention mining) · Zhou et al. 2019
+(CenterNet, objects as points) · Guo et al. 2019 (attention consistency under flips) · Heo et al. 2019 (fooling
+interpretations) · Chen et al. 2020 (SimCLR) · Rao et al. 2023 (model guidance with boxes) · Abedeen et al. 2023
+(FracAtlas, *Scientific Data*) · Linda 2025 (fracture detection and reporting, *J. Electrical Systems*) · Captum ·
+Kymatio · Ultralytics YOLOv8.

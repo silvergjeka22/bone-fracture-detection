@@ -25,10 +25,10 @@ POSITIVE = 0  # 'fractured': the class we must detect. F1, precision and recall 
 METRICS = ("accuracy", "f1", "precision", "recall", "specificity", "auc")
 
 
-def compute_metrics(y_true, probs):
-    """Metrics from true labels (N,) and predicted class probabilities (N, 2)."""
+def compute_metrics(y_true, probs, threshold=0.5):
+    """Metrics from true labels (N,) and class probabilities (N, 2); 'fractured' when its probability >= threshold."""
     y_true, probs = np.asarray(y_true), np.asarray(probs)
-    y_pred = probs.argmax(1)
+    y_pred = np.where(probs[:, POSITIVE] >= threshold, POSITIVE, 1 - POSITIVE)
     kw = dict(pos_label=POSITIVE, zero_division=0)
     is_pos = y_true == POSITIVE
     return {
@@ -39,6 +39,13 @@ def compute_metrics(y_true, probs):
         "specificity": float(((y_pred != POSITIVE) & ~is_pos).sum() / max((~is_pos).sum(), 1)),
         "auc": roc_auc_score(is_pos, probs[:, POSITIVE]) if 0 < is_pos.sum() < len(is_pos) else float("nan"),
     }
+
+
+def best_threshold(y_true, p_positive):
+    """Probability of 'fractured' from which an X-ray is called fractured: the best F1 on these (val) X-rays."""
+    is_pos, p = np.asarray(y_true) == POSITIVE, np.asarray(p_positive)
+    grid = np.linspace(0.05, 0.95, 91)
+    return float(grid[int(np.argmax([f1_score(is_pos, p >= t, zero_division=0) for t in grid]))])
 
 
 def class_weights(labels, num_classes=2):
@@ -164,14 +171,14 @@ def train_final(name, train_set, val_set, device, epochs=15, batch_size=32, lr=1
     return model.eval(), info
 
 
-def evaluate_test(model, test_set, device, batch_size=64):
+def evaluate_test(model, test_set, device, batch_size=64, threshold=0.5):
     """Test metrics, 95% bootstrap interval of the accuracy, confusion matrix and predictions."""
     loader = make_loader(test_set, batch_size=batch_size)
     start = time.time()
     probs, y, _ = predict(model, loader, device)
     ms_per_image = 1000 * (time.time() - start) / len(y)
-    y_pred = probs.argmax(1)
-    result = {**compute_metrics(y, probs),
+    y_pred = np.where(probs[:, POSITIVE] >= threshold, POSITIVE, 1 - POSITIVE)
+    result = {**compute_metrics(y, probs, threshold), "threshold": threshold,
               "accuracy_ci": bootstrap_ci(y, y_pred),
               "confusion_matrix": confusion_matrix(y, y_pred, labels=[0, 1]).tolist(),
               "y_true": y.tolist(), "y_pred": y_pred.tolist(), "prob_positive": probs[:, POSITIVE].tolist(),

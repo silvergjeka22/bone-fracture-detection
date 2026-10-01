@@ -1,4 +1,4 @@
-"""CNN, ScatNet and ResNet18: different feature extractors, the same Classifier (exam requirement).
+"""CNN, ScatNet, ResNet18 and our joint model: different feature extractors, the same Classifier (exam requirement).
 
 CNN and ScatNet both end on a 14x14 grid (224 / 16), so only the classifier's input size differs.
 """
@@ -64,11 +64,6 @@ class BoneFractureCNN(nn.Module):
         """Last convolutional block (256 x 14 x 14): the layer Grad-CAM explains."""
         return self.features[-1]
 
-    @property
-    def guide_layer(self):
-        """Layer whose Grad-CAM the guided training aligns with the fracture boxes (256 x 14 x 14)."""
-        return self.features[-1]
-
 
 class ScatNet(nn.Module):
     """Wavelet scattering transform (fixed, nothing learned) + the shared classifier."""
@@ -118,20 +113,45 @@ class ResNet18(nn.Module):
     def cam_layer(self):
         return self.backbone.layer4
 
+
+class JointNet(ResNet18):
+    """ResNet18 + the same classifier + a small fracture detector on layer3 (CenterNet style), trained together."""
+
+    def __init__(self, num_classes=2, dropout=0.5, pretrained=True):
+        super().__init__(num_classes, dropout, pretrained)
+        # per cell of the layer3 grid: fracture-centre score, centre offset (x, y), box width and height in cells
+        self.detector = nn.Sequential(nn.Conv2d(256, 128, 3, padding=1), nn.ReLU(), nn.Conv2d(128, 5, 1))
+        nn.init.constant_(self.detector[-1].bias[0], -2.19)  # start at p(centre) = 0.1 everywhere (CenterNet)
+
+    def grid(self, x):
+        """layer3 features (B, 256, S/16, S/16): where the classifier, the detector and Grad-CAM meet."""
+        b = self.backbone
+        x = (x * 0.5 + 0.5).expand(-1, 3, -1, -1)
+        x = b.maxpool(b.relu(b.bn1(b.conv1((x - self.mean) / self.std))))
+        return b.layer3(b.layer2(b.layer1(x)))
+
+    def classify(self, a):
+        return self.classifier(self.backbone.avgpool(self.backbone.layer4(a)).flatten(1))
+
+    def forward(self, x):
+        return self.classify(self.grid(x))
+
     @property
-    def guide_layer(self):
-        """layer3 (256 x 14 x 14): finer than layer4 (7 x 7) for thin fractures."""
+    def cam_layer(self):
+        """layer3: the grid the joint training guides, so Grad-CAM is scored where it was trained."""
         return self.backbone.layer3
 
 
 def build_model(name, image_size=224, pretrained=True):
-    """'cnn' | 'scatnet' | 'resnet18'. `pretrained` only matters for ResNet18."""
+    """'cnn' | 'scatnet' | 'resnet18' | 'joint'. `pretrained` only matters for ResNet18 and the joint model."""
     if name == "cnn":
         return BoneFractureCNN(image_size)
     if name == "scatnet":
         return ScatNet(image_size)
     if name == "resnet18":
         return ResNet18(pretrained=pretrained)
+    if name == "joint":
+        return JointNet(pretrained=pretrained)
     raise ValueError(f"Unknown model '{name}'. Use one of {MODEL_NAMES}.")
 
 

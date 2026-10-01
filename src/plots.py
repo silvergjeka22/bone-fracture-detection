@@ -20,8 +20,10 @@ from kymatio.scattering2d.filter_bank import filter_bank  # noqa: E402
 
 # ----------------------------------------------------------------------------- style
 INK, INK_2, GRID, SURFACE, NEUTRAL = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb", "#9a998f"
-MODEL_COLORS = {"cnn": "#2a78d6", "scatnet": "#eb6834", "resnet18": "#1baf7a"}
-MODEL_LABELS = {"cnn": "CNN", "scatnet": "ScatNet", "resnet18": "ResNet18"}
+MODEL_COLORS = {"cnn": "#2a78d6", "scatnet": "#eb6834", "resnet18": "#1baf7a",
+                "separate": "#52514e", "joint": "#4a3aa7", "joint_xai": "#e87ba4"}
+MODEL_LABELS = {"cnn": "CNN", "scatnet": "ScatNet", "resnet18": "ResNet18",
+                "separate": "A: separate", "joint": "B: joint", "joint_xai": "C: joint + XAI"}
 CLASS_COLORS = ["#4a3aa7", "#eda100"]  # fractured, not fractured
 METHOD_COLORS = {"Saliency": "#2a78d6", "Integrated Gradients": "#eb6834", "Guided Backprop": "#1baf7a",
                  "Grad-CAM": "#eda100", "Occlusion": "#e87ba4", "LIME": "#008300",
@@ -42,16 +44,12 @@ mpl.rcParams.update({
 
 
 def label(name):
-    """'resnet18_box_contrast' -> 'ResNet18 + box + contrast'."""
-    base, *extra = name.split("_")
-    return " + ".join([MODEL_LABELS.get(base, base), *extra]) if base in MODEL_LABELS else name
+    """'joint_xai' -> 'C: joint + XAI'."""
+    return MODEL_LABELS.get(name, name)
 
 
 def _color(name):
-    """Fixed colour of a model; the guided versions get violet (box) and pink (box + contrast)."""
-    if name in MODEL_COLORS:
-        return MODEL_COLORS[name]
-    return "#e87ba4" if name.endswith("contrast") else "#4a3aa7"
+    return MODEL_COLORS.get(name, NEUTRAL)
 
 
 def _rgba(values, cmap, alpha):
@@ -525,4 +523,74 @@ def plot_pipeline_examples(image_set, cases, n=4, save_to=None):
                Line2D([], [], color=BOX_COLORS["detector"], label="YOLO's box"),
                Line2D([], [], color=BOX_COLORS["ours"], label="explanation's box")]
     fig.legend(handles=handles, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.02))
+    _finish(fig, save_to)
+
+
+# ----------------------------------------------------------------------------- joint model
+
+def plot_joint_training(final, keys, save_to=None):
+    """Per epoch: val AUC and val Grad-CAM hit rate of each version, and the loss parts of the last one."""
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.4))
+    for k in keys:
+        h = final[k]["history"]
+        epochs = np.arange(1, len(h["val_auc"]) + 1)
+        axes[0].plot(epochs, 100 * np.array(h["val_auc"]), "o-", ms=3, color=_color(k), label=label(k))
+        axes[1].plot(epochs, h["val_cam_hit"], "o-", ms=3, color=_color(k), label=label(k))
+    h = final[keys[-1]]["history"]
+    for part, color in zip(("ce", "detect", "point", "agree", "erase"), (INK, "#4a3aa7", "#eda100", "#e87ba4", "#1baf7a")):
+        axes[2].plot(np.arange(1, len(h[part]) + 1), h[part], "o-", ms=3, color=color, label=part)
+    for ax, title in zip(axes, ("val AUC (%)", "val: Grad-CAM peak in the box (%)", f"{label(keys[-1])}: loss parts")):
+        ax.set_title(title)
+        ax.set_xlabel("epoch")
+        _grid_axes(ax)
+        ax.legend()
+    _finish(fig, save_to)
+
+
+def plot_joint_examples(images, cams, found, true_boxes, save_to=None):
+    """Rows = fractured X-rays; columns = Grad-CAM of each version, then the built-in detector's best box."""
+    cols = len(cams) + 1
+    fig, axes = plt.subplots(len(images), cols, figsize=(2.6 * cols, 2.7 * len(images)), squeeze=False)
+    for row, (image, truth) in enumerate(zip(images, true_boxes)):
+        for col in range(cols):
+            ax = axes[row, col]
+            ax.imshow(denormalize(image), cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            for box in truth:
+                _draw_box(ax, box, "radiologist")
+        for col, (name, maps) in enumerate(cams.items()):
+            heat = evidence(maps[row])
+            heat = (heat - heat.min()) / ((heat.max() - heat.min()) or 1)  # weakest -> transparent, strongest -> red
+            axes[row, col].imshow(_rgba(heat, POSITIVE, 0.6 * heat))
+            axes[row, col].text(0.03, 0.03, "hit" if pointing_game(maps[row], truth) else "miss",
+                                transform=axes[row, col].transAxes, fontsize=8, color=INK,
+                                bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
+            if row == 0:
+                axes[row, col].set_title(f"{label(name)}\nGrad-CAM", fontsize=9.5)
+        if len(found[row]):
+            _draw_box(axes[row, -1], found[row][0, :4], "detector")
+            axes[row, -1].text(0.03, 0.03, f"score {found[row][0, 4]:.2f}", transform=axes[row, -1].transAxes,
+                               fontsize=8, color=INK, bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
+        if row == 0:
+            axes[row, -1].set_title(f"{label(list(cams)[-1])}\nbuilt-in detector", fontsize=9.5)
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["detector"], label="detector's box")]
+    fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.02))
+    _finish(fig, save_to)
+
+
+def plot_erase_test(erase, save_to=None):
+    """Mean p(fractured) of the fractured test X-rays: as they are, with the fracture blurred, with a random patch blurred."""
+    kinds = list(next(iter(erase.values())))
+    width = 0.8 / len(erase)
+    fig, ax = plt.subplots(figsize=(7.5, 3.6))
+    for k, (name, values) in enumerate(erase.items()):
+        x = np.arange(len(kinds)) + (k - (len(erase) - 1) / 2) * width
+        ax.bar(x, [values[c] for c in kinds], width * 0.92, color=_color(name), label=label(name))
+    ax.set_xticks(range(len(kinds)), kinds)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("mean p(fractured) (%)")
+    ax.set_title("Does the model use the fracture? Blur it and look at the answer")
+    _grid_axes(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(erase))
     _finish(fig, save_to)

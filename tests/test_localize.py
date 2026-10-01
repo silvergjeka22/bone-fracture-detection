@@ -77,3 +77,21 @@ def test_detector_vs_xai():
     table = pd.DataFrame({"hit rate (%)": {"Occlusion": 60.0, "Random": 5.0}, "IoU": {"Occlusion": 0.2, "Random": np.nan}})
     out = localize.detector_vs_xai({"cnn": table}, {"hit rate (%)": 80.0, "IoU": 0.4}, {"cnn": "CNN"})
     assert list(out.index) == ["YOLO (trained on boxes)", "CNN: Occlusion", "Random point"]
+
+
+def test_average_precision():
+    truth = [np.array([[0, 0, 10, 10.0]]), np.array([[20, 20, 30, 30.0]])]
+    perfect = [np.array([[0, 0, 10, 10, 0.9]]), np.array([[20, 20, 30, 30, 0.8]])]
+    assert localize.average_precision(perfect, truth) == pytest.approx(1)
+    wrong_first = [np.array([[40, 40, 50, 50, 0.95], [0, 0, 10, 10, 0.9]]), np.array([[20, 20, 30, 30, 0.8]])]
+    assert localize.average_precision(wrong_first, truth) == pytest.approx(2 / 3)
+    assert localize.average_precision([np.zeros((0, 5))] * 2, truth) == 0
+
+
+def test_agreement_and_compare_hits():
+    truth = [np.array([[10, 10, 20, 20.0]])] * 2
+    on, off = square(12, 12, 16, 16), square(40, 40, 44, 44)
+    found = [np.array([[10, 10, 20, 20, 0.9]]), np.zeros((0, 5))]
+    assert localize.agreement([on, on], found, smooth=0) == 50  # no box: no agreement
+    table = localize.compare_hits({"M": np.stack([off, off])}, {"M": np.stack([on, on])}, truth, smooth=0)
+    assert table.loc["M", "hits A"] == 0 and table.loc["M", "hits C"] == 2 and table.loc["M", "only C"] == 2

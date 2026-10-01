@@ -1,0 +1,52 @@
+{
+ "model": "joint_xai",
+ "arch": "joint",
+ "history": {
+  "ce": [
+   0.6874162912368774
+  ],
+  "detect": [
+   3.7750478744506837
+  ],
+  "point": [
+   4.588380908966064
+  ],
+  "agree": [
+   1.1099526405334472
+  ],
+  "erase": [
+   0.6907419085502624
+  ],
+  "val_loss": [
+   0.6832040337955251
+  ],
+  "val_acc": [
+   0.5882352941176471
+  ],
+  "val_f1": [
+   0.7407407407407407
+  ],
+  "val_auc": [
+   0.5
+  ],
+  "val_cam_hit": [
+   0.0
+  ],
+  "seconds": [
+   16.120975255966187
+  ]
+ },
+ "best_epoch": 1,
+ "threshold": 0.05,
+ "seconds_per_epoch": 16.120975255966187,
+ "parameters": 11800775,
+ "settings": {
+  "detect": 1.0,
+  "point": 0.5,
+  "agree": 0.5,
+  "erase": 0.5,
+  "warmup": 0,
+  "batch_size": 16,
+  "image_size": 448
+ }
+}

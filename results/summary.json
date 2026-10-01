@@ -1,0 +1,779 @@
+{
+ "settings": {
+  "models": [
+   "cnn",
+   "scatnet",
+   "resnet18"
+  ],
+  "k_folds": 2,
+  "epochs": 1,
+  "batch_size": 32,
+  "lr": {
+   "cnn": 0.001,
+   "scatnet": 0.001,
+   "resnet18": 0.0001
+  },
+  "seed": 42,
+  "quick": true,
+  "xai_per_class": 2,
+  "xai_params": {
+   "ig_steps": 8,
+   "window": 32,
+   "stride": 16,
+   "lime_samples": 50
+  },
+  "box_threshold": 0.5,
+  "joint": {
+   "detect": 1.0,
+   "point": 0.5,
+   "agree": 0.5,
+   "erase": 0.5,
+   "warmup": 0
+  },
+  "joint_size": 448,
+  "joint_batch": 16,
+  "joint_xai": {
+   "ig_steps": 8,
+   "window": 32,
+   "stride": 16,
+   "lime_samples": 50,
+   "patch": 32
+  },
+  "yolo": {
+   "model": "yolov8n.yaml",
+   "epochs": 1,
+   "imgsz": 320,
+   "batch": 8
+  }
+ },
+ "dataset": {
+  "train": {
+   "fractured": 43,
+   "not fractured": 43,
+   "total": 86,
+   "% fractured": 50.0,
+   "fracture boxes": 56,
+   "median width (px)": 373,
+   "median height (px)": 454,
+   "mean intensity": 0.188
+  },
+  "val": {
+   "fractured": 10,
+   "not fractured": 7,
+   "total": 17,
+   "% fractured": 58.8,
+   "fracture boxes": 14,
+   "median width (px)": 373,
+   "median height (px)": 454,
+   "mean intensity": 0.193
+  },
+  "test": {
+   "fractured": 7,
+   "not fractured": 10,
+   "total": 17,
+   "% fractured": 41.2,
+   "fracture boxes": 9,
+   "median width (px)": 373,
+   "median height (px)": 454,
+   "mean intensity": 0.184
+  }
+ },
+ "duplicates": {
+  "dataset": {
+   "images": 120,
+   "with a near-duplicate": 4,
+   "duplicate groups": 2,
+   "largest group": 2,
+   "%": 3.3
+  }
+ },
+ "best_model": "scatnet",
+ "select_by": "f1",
+ "models": {
+  "cnn": {
+   "cv_mean": {
+    "accuracy": 0.47673160173160173,
+    "f1": 0.3225806451612903,
+    "precision": 0.23809523809523808,
+    "recall": 0.5,
+    "specificity": 0.5,
+    "auc": 0.7368835874270656
+   },
+   "cv_std": {
+    "accuracy": 0.0005411255411255644,
+    "f1": 0.3225806451612903,
+    "precision": 0.23809523809523808,
+    "recall": 0.5,
+    "specificity": 0.5,
+    "auc": 0.06642904197252025
+   },
+   "test": {
+    "accuracy": 0.4117647058823529,
+    "f1": 0.5833333333333334,
+    "precision": 0.4117647058823529,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "auc": 0.4285714285714286
+   },
+   "test_accuracy_ci": [
+    0.17647058823529413,
+    0.6470588235294118
+   ],
+   "threshold": 0.5,
+   "confusion_matrix": [
+    [
+     7,
+     0
+    ],
+    [
+     10,
+     0
+    ]
+   ],
+   "parameters": 26146146,
+   "best_epoch": 1
+  },
+  "scatnet": {
+   "cv_mean": {
+    "accuracy": 0.49945887445887444,
+    "f1": 0.6658642272508426,
+    "precision": 0.49945887445887444,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "auc": 0.5
+   },
+   "cv_std": {
+    "accuracy": 0.02326839826839827,
+    "f1": 0.020702936928261917,
+    "precision": 0.02326839826839827,
+    "recall": 0.0,
+    "specificity": 0.0,
+    "auc": 0.0
+   },
+   "test": {
+    "accuracy": 0.5882352941176471,
+    "f1": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "specificity": 1.0,
+    "auc": 0.6857142857142857
+   },
+   "test_accuracy_ci": [
+    0.35294117647058826,
+    0.8235294117647058
+   ],
+   "threshold": 0.5,
+   "confusion_matrix": [
+    [
+     0,
+     7
+    ],
+    [
+     0,
+     10
+    ]
+   ],
+   "parameters": 41914052,
+   "best_epoch": 1
+  },
+  "resnet18": {
+   "cv_mean": {
+    "accuracy": 0.487012987012987,
+    "f1": 0.64375,
+    "precision": 0.49329268292682926,
+    "recall": 0.9282608695652175,
+    "specificity": 0.047619047619047616,
+    "auc": 0.45928147939017505
+   },
+   "cv_std": {
+    "accuracy": 0.05844155844155843,
+    "f1": 0.04375000000000001,
+    "precision": 0.04329268292682928,
+    "recall": 0.028260869565217395,
+    "specificity": 0.047619047619047616,
+    "auc": 0.02519057029926594
+   },
+   "test": {
+    "accuracy": 0.4117647058823529,
+    "f1": 0.5833333333333334,
+    "precision": 0.4117647058823529,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "auc": 0.8571428571428571
+   },
+   "test_accuracy_ci": [
+    0.17647058823529413,
+    0.6470588235294118
+   ],
+   "threshold": 0.5,
+   "confusion_matrix": [
+    [
+     7,
+     0
+    ],
+    [
+     10,
+     0
+    ]
+   ],
+   "parameters": 11505090,
+   "best_epoch": 1
+  },
+  "separate": {
+   "cv_mean": null,
+   "cv_std": null,
+   "test": {
+    "accuracy": 0.5882352941176471,
+    "f1": 0.6666666666666666,
+    "precision": 0.5,
+    "recall": 1.0,
+    "specificity": 0.3,
+    "auc": 0.8
+   },
+   "test_accuracy_ci": [
+    0.35294117647058826,
+    0.8235294117647058
+   ],
+   "threshold": 0.57,
+   "confusion_matrix": [
+    [
+     7,
+     0
+    ],
+    [
+     7,
+     3
+    ]
+   ],
+   "parameters": 11800775,
+   "best_epoch": 1
+  },
+  "joint": {
+   "cv_mean": null,
+   "cv_std": null,
+   "test": {
+    "accuracy": 0.4117647058823529,
+    "f1": 0.5833333333333334,
+    "precision": 0.4117647058823529,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "auc": 0.7714285714285715
+   },
+   "test_accuracy_ci": [
+    0.17647058823529413,
+    0.6470588235294118
+   ],
+   "threshold": 0.57,
+   "confusion_matrix": [
+    [
+     7,
+     0
+    ],
+    [
+     10,
+     0
+    ]
+   ],
+   "parameters": 11800775,
+   "best_epoch": 1
+  },
+  "joint_xai": {
+   "cv_mean": null,
+   "cv_std": null,
+   "test": {
+    "accuracy": 0.4117647058823529,
+    "f1": 0.5833333333333334,
+    "precision": 0.4117647058823529,
+    "recall": 1.0,
+    "specificity": 0.0,
+    "auc": 0.6428571428571429
+   },
+   "test_accuracy_ci": [
+    0.17647058823529413,
+    0.6470588235294118
+   ],
+   "threshold": 0.05,
+   "confusion_matrix": [
+    [
+     7,
+     0
+    ],
+    [
+     10,
+     0
+    ]
+   ],
+   "parameters": 11800775,
+   "best_epoch": 1
+  }
+ },
+ "mcnemar": {
+  "cnn vs scatnet": {
+   "only A right": 7,
+   "only B right": 10,
+   "p-value": 0.6291,
+   "significant (p<0.05)": false
+  },
+  "cnn vs resnet18": {
+   "only A right": 0,
+   "only B right": 0,
+   "p-value": 1.0,
+   "significant (p<0.05)": false
+  },
+  "scatnet vs resnet18": {
+   "only A right": 10,
+   "only B right": 7,
+   "p-value": 0.6291,
+   "significant (p<0.05)": false
+  }
+ },
+ "xai": {
+  "cnn": {
+   "deletion_auc": {
+    "Occlusion": 0.48510000109672546,
+    "Integrated Gradients": 0.486299991607666,
+    "LIME": 0.49559998512268066,
+    "Guided Backprop": 0.4984000027179718,
+    "Grad-CAM": 0.49880000948905945,
+    "Saliency": 0.49900001287460327,
+    "Random": 0.5005000233650208
+   },
+   "seconds_per_image": {
+    "Saliency": 0.07206273078918457,
+    "Integrated Gradients": 0.19486486911773682,
+    "Guided Backprop": 0.004656791687011719,
+    "Grad-CAM": 0.007481217384338379,
+    "Occlusion": 0.41951560974121094,
+    "LIME": 0.1916118860244751,
+    "Occlusion (ours)": 0.10544925928115845
+   }
+  },
+  "scatnet": {
+   "deletion_auc": {
+    "Saliency": 0.5,
+    "Integrated Gradients": 0.5,
+    "Guided Backprop": 0.5,
+    "Occlusion": 0.5,
+    "LIME": 0.5,
+    "Random": 0.5
+   },
+   "seconds_per_image": {
+    "Saliency": 0.7801007628440857,
+    "Integrated Gradients": 0.7182654738426208,
+    "Guided Backprop": 0.6922428011894226,
+    "Grad-CAM": 0.00022476911544799805,
+    "Occlusion": 1.2024099230766296,
+    "LIME": 0.5786516070365906,
+    "Occlusion (ours)": 1.1890453696250916
+   }
+  },
+  "separate": {
+   "deletion_auc": {
+    "Grad-CAM": 0.49230000376701355,
+    "Occlusion": 0.49239999055862427,
+    "Guided Backprop": 0.4952999949455261,
+    "LIME": 0.49639999866485596,
+    "Saliency": 0.49790000915527344,
+    "Random": 0.5037000179290771,
+    "Integrated Gradients": 0.5041999816894531
+   },
+   "seconds_per_image": {
+    "Saliency": 0.01707214117050171,
+    "Integrated Gradients": 0.08697426319122314,
+    "Guided Backprop": 0.01415097713470459,
+    "Grad-CAM": 0.007071435451507568,
+    "Occlusion": 2.7369475960731506,
+    "LIME": 0.22196823358535767
+   }
+  },
+  "joint": {
+   "deletion_auc": {
+    "Grad-CAM": 0.4875999987125397,
+    "Occlusion": 0.4952999949455261,
+    "Guided Backprop": 0.4959000051021576,
+    "LIME": 0.49779999256134033,
+    "Saliency": 0.49869999289512634,
+    "Integrated Gradients": 0.49970000982284546,
+    "Random": 0.5019999742507935
+   },
+   "seconds_per_image": {
+    "Saliency": 0.016947388648986816,
+    "Integrated Gradients": 0.0864560604095459,
+    "Guided Backprop": 0.014475345611572266,
+    "Grad-CAM": 0.0074724555015563965,
+    "Occlusion": 2.795910596847534,
+    "LIME": 0.2267298698425293
+   }
+  },
+  "joint_xai": {
+   "deletion_auc": {
+    "Grad-CAM": 0.49549999833106995,
+    "Integrated Gradients": 0.49559998512268066,
+    "LIME": 0.49630001187324524,
+    "Guided Backprop": 0.4970000088214874,
+    "Saliency": 0.49810001254081726,
+    "Occlusion": 0.498199999332428,
+    "Random": 0.4993000030517578
+   },
+   "seconds_per_image": {
+    "Saliency": 0.01687246561050415,
+    "Integrated Gradients": 0.08496266603469849,
+    "Guided Backprop": 0.0141182541847229,
+    "Grad-CAM": 0.006896555423736572,
+    "Occlusion": 2.766763210296631,
+    "LIME": 0.22349029779434204
+   }
+  }
+ },
+ "scratch_vs_captum": {
+  "cnn": {
+   "mean Pearson r": 1.0,
+   "min Pearson r": 1.0,
+   "max |difference|": 1.043e-07,
+   "max |attribution|": 0.0178220049
+  },
+  "scatnet": {
+   "mean Pearson r": 0.9999999999,
+   "min Pearson r": 0.9999999997,
+   "max |difference|": 2.67029e-05,
+   "max |attribution|": 1.9015254974
+  }
+ },
+ "localization": {
+  "cnn": {
+   "LIME": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.01,
+    "box size (%)": 2.0
+   },
+   "Random": {
+    "hit rate (%)": 1.6,
+    "IoU": null,
+    "box size (%)": null
+   },
+   "Saliency": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.053,
+    "box size (%)": 21.7
+   },
+   "Guided Backprop": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.014,
+    "box size (%)": 12.8
+   },
+   "Integrated Gradients": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.039,
+    "box size (%)": 6.9
+   },
+   "Occlusion": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.05,
+    "box size (%)": 16.6
+   },
+   "Grad-CAM": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.012,
+    "box size (%)": 100.0
+   }
+  },
+  "scatnet": {
+   "Occlusion": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.101,
+    "box size (%)": 7.3
+   },
+   "Random": {
+    "hit rate (%)": 1.6,
+    "IoU": null,
+    "box size (%)": null
+   },
+   "Integrated Gradients": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 0.6
+   },
+   "Saliency": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 1.6
+   },
+   "Guided Backprop": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.037,
+    "box size (%)": 1.2
+   },
+   "LIME": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.01,
+    "box size (%)": 1.9
+   }
+  },
+  "separate": {
+   "Guided Backprop": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.009,
+    "box size (%)": 0.2
+   },
+   "Random": {
+    "hit rate (%)": 1.5,
+    "IoU": null,
+    "box size (%)": null
+   },
+   "Saliency": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.06,
+    "box size (%)": 1.5
+   },
+   "Integrated Gradients": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.015,
+    "box size (%)": 2.5
+   },
+   "Grad-CAM": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 0.5
+   },
+   "Occlusion": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 1.6
+   },
+   "LIME": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 2.5
+   }
+  },
+  "joint": {
+   "Guided Backprop": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.0,
+    "box size (%)": 0.2
+   },
+   "Random": {
+    "hit rate (%)": 1.5,
+    "IoU": null,
+    "box size (%)": null
+   },
+   "Saliency": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 1.1
+   },
+   "Integrated Gradients": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.057,
+    "box size (%)": 1.5
+   },
+   "Grad-CAM": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 1.0
+   },
+   "Occlusion": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.003,
+    "box size (%)": 2.4
+   },
+   "LIME": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 1.6
+   }
+  },
+  "joint_xai": {
+   "Integrated Gradients": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.089,
+    "box size (%)": 1.3
+   },
+   "Occlusion": {
+    "hit rate (%)": 14.3,
+    "IoU": 0.087,
+    "box size (%)": 2.4
+   },
+   "Random": {
+    "hit rate (%)": 1.5,
+    "IoU": null,
+    "box size (%)": null
+   },
+   "Guided Backprop": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.009,
+    "box size (%)": 0.2
+   },
+   "Saliency": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.03,
+    "box size (%)": 0.9
+   },
+   "Grad-CAM": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 3.2
+   },
+   "LIME": {
+    "hit rate (%)": 0.0,
+    "IoU": 0.001,
+    "box size (%)": 1.8
+   }
+  }
+ },
+ "joint": {
+  "comparison": {
+   "A: separate": {
+    "test accuracy (%)": 58.824,
+    "test F1 (%)": 66.667,
+    "fractures found (%)": 100.0,
+    "test AUC (%)": 80.0,
+    "detector AP@0.5 (%)": 0.0,
+    "detector hit rate (%)": 14.3,
+    "Grad-CAM hit rate (%)": 0.0,
+    "best XAI method": "Guided Backprop",
+    "best XAI hit rate (%)": 14.3,
+    "XAI hit rate, mean of 6 (%)": 2.383,
+    "Grad-CAM inside the detector's box (%)": 28.571,
+    "deletion AUC, mean (lower = better)": 0.4959999919,
+    "p(fractured) drop, fracture blurred": -0.002,
+    "p(fractured) drop, random patch blurred": -0.003
+   },
+   "B: joint": {
+    "test accuracy (%)": 41.176,
+    "test F1 (%)": 58.333,
+    "fractures found (%)": 100.0,
+    "test AUC (%)": 77.143,
+    "detector AP@0.5 (%)": 0.0,
+    "detector hit rate (%)": 28.6,
+    "Grad-CAM hit rate (%)": 0.0,
+    "best XAI method": "Guided Backprop",
+    "best XAI hit rate (%)": 14.3,
+    "XAI hit rate, mean of 6 (%)": 2.383,
+    "Grad-CAM inside the detector's box (%)": 0.0,
+    "deletion AUC, mean (lower = better)": 0.4959999919,
+    "p(fractured) drop, fracture blurred": 0.075,
+    "p(fractured) drop, random patch blurred": 0.016
+   },
+   "C: joint + XAI": {
+    "test accuracy (%)": 41.176,
+    "test F1 (%)": 58.333,
+    "fractures found (%)": 100.0,
+    "test AUC (%)": 64.286,
+    "detector AP@0.5 (%)": 0.0,
+    "detector hit rate (%)": 0.0,
+    "Grad-CAM hit rate (%)": 0.0,
+    "best XAI method": "Integrated Gradients",
+    "best XAI hit rate (%)": 14.3,
+    "XAI hit rate, mean of 6 (%)": 4.767,
+    "Grad-CAM inside the detector's box (%)": 0.0,
+    "deletion AUC, mean (lower = better)": 0.4970000088,
+    "p(fractured) drop, fracture blurred": 0.179,
+    "p(fractured) drop, random patch blurred": -0.009
+   }
+  },
+  "hit_tests": {
+   "Saliency": {
+    "hits A": 0.0,
+    "hits C": 0.0,
+    "only A": 0.0,
+    "only C": 0.0,
+    "p-value": 1.0
+   },
+   "Integrated Gradients": {
+    "hits A": 0.0,
+    "hits C": 1.0,
+    "only A": 0.0,
+    "only C": 1.0,
+    "p-value": 1.0
+   },
+   "Guided Backprop": {
+    "hits A": 1.0,
+    "hits C": 0.0,
+    "only A": 1.0,
+    "only C": 0.0,
+    "p-value": 1.0
+   },
+   "Grad-CAM": {
+    "hits A": 0.0,
+    "hits C": 0.0,
+    "only A": 0.0,
+    "only C": 0.0,
+    "p-value": 1.0
+   },
+   "Occlusion": {
+    "hits A": 0.0,
+    "hits C": 1.0,
+    "only A": 0.0,
+    "only C": 1.0,
+    "p-value": 1.0
+   },
+   "LIME": {
+    "hits A": 0.0,
+    "hits C": 0.0,
+    "only A": 0.0,
+    "only C": 0.0,
+    "p-value": 1.0
+   }
+  },
+  "erase": {
+   "separate": {
+    "as they are": 58.78978967666626,
+    "fracture blurred": 58.79151480538505,
+    "random patch blurred": 58.79231010164533
+   },
+   "joint": {
+    "as they are": 59.60492662021092,
+    "fracture blurred": 59.53039952686855,
+    "random patch blurred": 59.58885891096932
+   },
+   "joint_xai": {
+    "as they are": 55.47897304807391,
+    "fracture blurred": 55.29949409621102,
+    "random patch blurred": 55.488021033150815
+   }
+  },
+  "detectors": {
+   "separate": {
+    "AP@0.5 (%)": 0.0,
+    "hit rate (%)": 14.3,
+    "IoU": 0.018,
+    "box size (%)": 69.4
+   },
+   "joint": {
+    "AP@0.5 (%)": 0.0,
+    "hit rate (%)": 28.6,
+    "IoU": 0.0,
+    "box size (%)": 0.0
+   },
+   "joint_xai": {
+    "AP@0.5 (%)": 0.0,
+    "hit rate (%)": 0.0,
+    "IoU": 0.0,
+    "box size (%)": 0.0
+   }
+  }
+ },
+ "pipeline": {
+  "classifier": "separate",
+  "box_method": "LIME",
+  "detector": {
+   "mAP@0.5": 0.0,
+   "mAP@0.5:0.95": 0.0,
+   "precision": 0.0,
+   "recall": 0.0
+  },
+  "detector_boxes": {
+   "AP@0.5 (%)": 0.0,
+   "hit rate (%)": 14.3,
+   "IoU": 0.018,
+   "box size (%)": 69.4
+  },
+  "cases": {
+   "needs review (%)": 82.35294117647058,
+   "accuracy when decided (%)": 100.0,
+   "fractures missed (%)": 0.0,
+   "explanation inside the detector box (%)": NaN
+  }
+ }
+}

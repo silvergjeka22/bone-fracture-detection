@@ -18,6 +18,15 @@ def test_metrics_fractured_is_positive():
     assert m["auc"] == pytest.approx(0.75)
 
 
+def test_threshold_chosen_on_f1():
+    y = np.array([0, 0, 1, 1, 1, 1])
+    p = np.array([0.3, 0.25, 0.1, 0.05, 0.2, 0.15])  # the fractured X-rays have low but the highest probabilities
+    t = training.best_threshold(y, p)
+    assert 0.2 < t <= 0.25
+    probs = np.column_stack([p, 1 - p])
+    assert training.compute_metrics(y, probs, t)["f1"] == 1 and training.compute_metrics(y, probs)["recall"] == 0
+
+
 def test_bootstrap_ci_contains_accuracy():
     y, p = np.array([0, 1] * 50), np.array([0, 1] * 40 + [1, 0] * 10)
     lo, hi = training.bootstrap_ci(y, p)

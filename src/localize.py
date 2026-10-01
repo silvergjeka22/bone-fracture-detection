@@ -6,6 +6,7 @@ hit rate = the hottest point is inside a radiologist's box (pointing game); IoU 
 import numpy as np
 import pandas as pd
 from scipy import ndimage
+from scipy.stats import binomtest
 
 THRESHOLD = 0.5  # share of the strongest evidence a pixel needs to be part of the box
 SMOOTH = 4       # Gaussian sigma in pixels
@@ -105,4 +106,44 @@ def detector_vs_xai(localization, detector_row, model_labels=None):
         methods = table.drop("Random")
         rows[f"{model_labels.get(name, name)}: {methods.index[0]}"] = methods.iloc[0].to_dict()
     rows["Random point"] = next(iter(localization.values())).loc["Random"].to_dict()
+    return pd.DataFrame(rows).T
+
+
+def average_precision(found, true_boxes, threshold=0.5):
+    """AP at IoU >= threshold (as in mAP@0.5): scored boxes (k, 5) of every X-ray against its true boxes."""
+    n_true, scored = sum(len(t) for t in true_boxes), []
+    for boxes, truth in zip(found, true_boxes):
+        truth, used = np.asarray(truth, dtype=float).reshape(-1, 4), np.zeros(len(truth), bool)
+        for box in boxes[np.argsort(-boxes[:, 4], kind="stable")]:
+            overlaps = np.array([iou(box[:4], t) for t in truth])
+            j = int(overlaps.argmax()) if len(truth) else -1
+            hit = j >= 0 and overlaps[j] >= threshold and not used[j]
+            if hit:
+                used[j] = True  # each true box is found once; a second box on it is a false positive
+            scored.append((box[4], hit))
+    if not scored or n_true == 0:
+        return 0.0
+    hits = np.array([h for _, h in sorted(scored, key=lambda s: -s[0])])
+    recall = np.cumsum(hits) / n_true
+    precision = np.maximum.accumulate((np.cumsum(hits) / np.arange(1, len(hits) + 1))[::-1])[::-1]
+    return float(np.sum(np.diff(recall, prepend=0) * precision))
+
+
+def agreement(maps, found, smooth=SMOOTH):
+    """Share (%) of X-rays whose map has its hottest point inside the detector's most confident box (no box: no)."""
+    return 100 * float(np.mean([len(b) > 0 and pointing_game(a, b[:1, :4], smooth) for a, b in zip(maps, found)]))
+
+
+def compare_hits(maps_a, maps_b, true_boxes, names=("A", "C"), smooth=SMOOTH):
+    """Per method: hits of two models on the same X-rays and the exact McNemar p-value (is the gain real?)."""
+    rows = {}
+    for method in maps_a:
+        if method not in maps_b or np.isnan(maps_a[method]).all():
+            continue
+        a = np.array([pointing_game(m, t, smooth) for m, t in zip(maps_a[method], true_boxes)])
+        b = np.array([pointing_game(m, t, smooth) for m, t in zip(maps_b[method], true_boxes)])
+        only_a, only_b = int((a & ~b).sum()), int((b & ~a).sum())
+        p = binomtest(min(only_a, only_b), only_a + only_b, 0.5).pvalue if only_a + only_b else 1.0
+        rows[method] = {f"hits {names[0]}": int(a.sum()), f"hits {names[1]}": int(b.sum()),
+                        f"only {names[0]}": only_a, f"only {names[1]}": only_b, "p-value": round(float(p), 4)}
     return pd.DataFrame(rows).T
