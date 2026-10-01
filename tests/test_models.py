@@ -46,6 +46,12 @@ def test_gradients_reach_the_input():
         assert x.grad is not None and x.grad.abs().sum() > 0, name
 
 
+def test_guide_layers():
+    assert models.build_model("cnn", SIZE).guide_layer is not None
+    assert models.build_model("resnet18", SIZE, pretrained=False).guide_layer is not None
+    assert getattr(models.build_model("scatnet", SIZE), "guide_layer", None) is None  # no learned conv layer
+
+
 def test_cam_layers():
     assert models.build_model("cnn", SIZE).cam_layer is not None
     assert models.build_model("resnet18", SIZE, pretrained=False).cam_layer is not None

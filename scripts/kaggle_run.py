@@ -3,7 +3,6 @@
     push [--quick] [--user NAME]   pack src/ into the notebook and start it on YOUR Kaggle account
     status                         is it running, finished or failed?
     get                            download the output into out/run-<time>/ and copy results/ into ./results
-    slides                         rebuild presentation/main.pdf (needs make + LaTeX)
 
 The code travels inside the notebook (no GitHub token, no extra Kaggle dataset). The notebook is
 <your-kaggle-username>/bone-fracture-detection; the dataset and the GPU come from kernel-metadata.json.
@@ -156,7 +155,7 @@ def get(user):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run the notebook on Kaggle and get the results.")
-    parser.add_argument("command", choices=["push", "status", "get", "slides"])
+    parser.add_argument("command", choices=["push", "status", "get"])
     parser.add_argument("--quick", action="store_true", help="5-minute health check on a small subset")
     parser.add_argument("--user", help="your Kaggle username (found automatically when possible)")
     parser.add_argument("--dry-run", action="store_true", help="prepare .kaggle-build/ without uploading")
@@ -166,12 +165,8 @@ def main(argv=None):
         push(args.quick, args.user, args.dry_run)
     elif args.command == "status":
         status(args.user)
-    elif args.command == "get":
-        get(args.user)
-    elif shutil.which("make"):
-        subprocess.run(["make", "-C", str(ROOT / "presentation")], check=True)
     else:
-        sys.exit("The slides need make and LaTeX (macOS / Linux).")
+        get(args.user)
 
 
 if __name__ == "__main__":

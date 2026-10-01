@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 Exam project (Visual Intelligence, UniVR 2025/26): fracture classification on FracAtlas, CNN vs ScatNet
-(+ ResNet18), six XAI methods (Occlusion also from scratch), XAI maps -> fracture boxes (`localize.py`), and a
-pipeline after Linda (2025): best classifier + YOLOv8 (`detect.py`) + best XAI -> report (`pipeline.py`).
+(+ ResNet18), six XAI methods (Occlusion also from scratch), XAI maps -> fracture boxes (`localize.py`), guided
+training of the best model (`guidance.py`), and a pipeline after Linda (2025): best classifier + YOLOv8
+(`detect.py`) + best XAI -> report (`pipeline.py`).
 Exam requirements: `.claude/skills/exam-checklist/SKILL.md`.
 
 ## Rules
@@ -14,8 +15,8 @@ Exam requirements: `.claude/skills/exam-checklist/SKILL.md`.
 - Class 0 = `fractured` is the positive class; the loss is weighted (1 in 6 fractured).
 - Boxes are `(x0, y0, x1, y1)` in pixels of the 224x224 image (`ImageSet.boxes`).
 - `ultralytics` is imported only inside `detect.py` functions (unit tests use a fake one).
-- Figures: one function each in `plots.py`, saved as `FIG_DIR / "<name>.png"` (the slides use that name).
-- Slide numbers only from `report.latex_macros`, each with a fallback in `presentation/defaults.tex`.
+- Figures: one function each in `plots.py`, saved as `FIG_DIR / "<name>.png"`; numbers in `results/summary.json`.
+- Guided training (`guidance.py`): weighted CE + box * Energy loss (Grad-CAM in the true box) + contrast * SupCon loss.
 - `utils.patch_scipy_for_kymatio()` before `import kymatio`.
 
 ## Commands
@@ -23,7 +24,7 @@ Exam requirements: `.claude/skills/exam-checklist/SKILL.md`.
 ```bash
 pytest -m "not slow"                           # fast tests
 pytest -m slow                                 # whole notebook on synthetic data
-./run.sh push [--quick] | status | get | slides   # Kaggle (Windows: run.bat)
+./run.sh push [--quick] | status | get            # Kaggle (Windows: run.bat)
 python .claude/skills/exam-checklist/scripts/check_exam.py
 ```
 

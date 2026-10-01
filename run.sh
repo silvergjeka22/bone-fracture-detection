@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macOS / Linux / Windows Git Bash:  ./run.sh push [--quick] | status | get | slides   (Windows PowerShell: run.bat)
+# macOS / Linux / Windows Git Bash:  ./run.sh push [--quick] | status | get   (Windows PowerShell: run.bat)
 set -euo pipefail
 cd "$(dirname "$0")"
 for py in "${PYTHON:-}" python3 python py; do

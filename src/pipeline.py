@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .localize import heatmap_to_box, pointing_game
-from .xai import DEFAULT_PARAMS, METHODS
+from .localize import heatmap_to_box, localization_table, pointing_game
+from .xai import DEFAULT_PARAMS, METHODS, explain_all
 
 VERDICTS = ("fracture", "no fracture", "needs review")
 
@@ -21,6 +21,15 @@ def verdict(p_fractured, has_box, threshold=0.5):
     if p_fractured < threshold and not has_box:
         return "no fracture"
     return "needs review"
+
+
+def pick_method(model, val_set, threshold=0.5, **params):
+    """XAI method with the most hits on the fractured val X-rays (the test set is never used to choose)."""
+    idx = np.flatnonzero(val_set.labels == 0)
+    images, _ = val_set.tensors(idx)
+    maps, _ = explain_all(model, images, np.zeros(len(idx), dtype=int), **params)
+    table = localization_table(maps, [val_set.boxes[i] for i in idx], threshold)
+    return table.drop("Random").index[0], table
 
 
 def run(model, image_set, probs, detections, method, device, threshold=0.5, **params):

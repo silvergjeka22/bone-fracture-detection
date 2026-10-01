@@ -64,6 +64,11 @@ class BoneFractureCNN(nn.Module):
         """Last convolutional block (256 x 14 x 14): the layer Grad-CAM explains."""
         return self.features[-1]
 
+    @property
+    def guide_layer(self):
+        """Layer whose Grad-CAM the guided training aligns with the fracture boxes (256 x 14 x 14)."""
+        return self.features[-1]
+
 
 class ScatNet(nn.Module):
     """Wavelet scattering transform (fixed, nothing learned) + the shared classifier."""
@@ -112,6 +117,11 @@ class ResNet18(nn.Module):
     @property
     def cam_layer(self):
         return self.backbone.layer4
+
+    @property
+    def guide_layer(self):
+        """layer3 (256 x 14 x 14): finer than layer4 (7 x 7) for thin fractures."""
+        return self.backbone.layer3
 
 
 def build_model(name, image_size=224, pretrained=True):

@@ -97,14 +97,6 @@ def score_boxes(boxes, true_boxes, shape):
                                                         for b in top])), 1)}
 
 
-def choose_method(localization, deletion):
-    """XAI method for the pipeline: the most hits among the methods that beat Random in the deletion test."""
-    auc = deletion["deletion AUC (mean)"]
-    faithful = [m for m in auc.index if m != "Random" and auc[m] < auc["Random"]]
-    candidates = [m for m in localization.index if m != "Random" and (m in faithful or not faithful)]
-    return max(candidates, key=lambda m: localization.loc[m, "hit rate (%)"])
-
-
 def detector_vs_xai(localization, detector_row, model_labels=None):
     """One row per box source: the detector, the best XAI method of every model, a random point."""
     model_labels = model_labels or {}

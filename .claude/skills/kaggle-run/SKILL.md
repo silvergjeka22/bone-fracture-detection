@@ -1,6 +1,6 @@
 ---
 name: kaggle-run
-description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU and bring the results back with ./run.sh (macOS, Linux, Git Bash) or run.bat (Windows) - push, quick check, status, download into results/, rebuild slides, and debug failed Kaggle runs (login, 403, dataset not found, kymatio/scipy error, missing weights, 12-hour limit). Use it whenever the user wants to train, re-run, get results, "run it on Kaggle", check a Kaggle run, or asks why the Kaggle kernel failed, even if they don't say "skill".
+description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU and bring the results back with ./run.sh (macOS, Linux, Git Bash) or run.bat (Windows) - push, quick check, status, download into results/, and debug failed Kaggle runs (login, 403, dataset not found, kymatio/scipy error, missing weights, 12-hour limit). Use it whenever the user wants to train, re-run, get results, "run it on Kaggle", check a Kaggle run, or asks why the Kaggle kernel failed, even if they don't say "skill".
 ---
 
 # Run the experiment on Kaggle
@@ -19,7 +19,7 @@ description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU 
 
 1. `./run.sh push --quick`, then `./run.sh status` until complete, then `./run.sh get`.
 2. `./run.sh push` (full run, ~2-3 h), later `./run.sh get`.
-3. `./run.sh slides`, commit `results/` (models, attributions, detector are gitignored), run the exam checklist.
+3. Commit `results/` (models, attributions, detector are gitignored), run the exam checklist.
 
 The sandbox may not reach kaggle.com: then the user runs these commands; say so instead of retrying.
 

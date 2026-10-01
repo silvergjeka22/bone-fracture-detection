@@ -281,11 +281,11 @@ def save_model(model, name, results_dir):
     torch.save(model.state_dict(), path)
 
 
-def load_model(name, results_dir, device, image_size=224):
-    """Model with the weights saved by train_final, in eval mode."""
+def load_model(name, results_dir, device, image_size=224, arch=None):
+    """Model with the saved weights results_dir/models/<name>.pth, in eval mode (arch: model type if not `name`)."""
     path = Path(results_dir) / "models" / f"{name}.pth"
     if not path.exists():
         raise FileNotFoundError(f"{path} not found: run the notebook with TRAIN = True first.")
-    model = build_model(name, image_size, pretrained=False)
+    model = build_model(arch or name, image_size, pretrained=False)
     model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
     return model.to(device).eval()

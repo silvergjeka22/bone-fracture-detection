@@ -41,8 +41,24 @@ mpl.rcParams.update({
 })
 
 
-def _label(name):
-    return MODEL_LABELS.get(name, name)
+def label(name):
+    """'resnet18_box_contrast' -> 'ResNet18 + box + contrast'."""
+    base, *extra = name.split("_")
+    return " + ".join([MODEL_LABELS.get(base, base), *extra]) if base in MODEL_LABELS else name
+
+
+def _color(name):
+    """Fixed colour of a model; the guided versions get violet (box) and pink (box + contrast)."""
+    if name in MODEL_COLORS:
+        return MODEL_COLORS[name]
+    return "#e87ba4" if name.endswith("contrast") else "#4a3aa7"
+
+
+def _rgba(values, cmap, alpha):
+    """Colour image with a per-pixel transparency (works on every matplotlib version)."""
+    rgba = cmap(np.clip(values, 0, 1))
+    rgba[..., 3] = np.clip(alpha, 0, 1)
+    return rgba
 
 
 def _finish(fig, save_to=None):
@@ -154,7 +170,7 @@ def plot_learning_curves(cv, final=None, save_to=None):
     cols = 4 if final else 2
     fig, axes = plt.subplots(len(names), cols, figsize=(3.6 * cols, 2.7 * len(names)), squeeze=False)
     for row, name in enumerate(names):
-        color = MODEL_COLORS.get(name, INK)
+        color = _color(name)
         panels = [("cv", "loss"), ("cv", "acc")] + ([("final", "loss"), ("final", "acc")] if final else [])
         for col, (source, metric) in enumerate(panels):
             ax = axes[row, col]
@@ -172,7 +188,7 @@ def plot_learning_curves(cv, final=None, save_to=None):
             if source == "final":
                 ax.axvline(final[name]["best_epoch"], color=INK_2, linewidth=0.8)
             where = f"{len(cv[name]['histories'])}-fold CV (mean ± std)" if source == "cv" else "final training"
-            ax.set_title(f"{_label(name)}: {'loss' if metric == 'loss' else 'accuracy'}, {where}", fontsize=9.5)
+            ax.set_title(f"{label(name)}: {'loss' if metric == 'loss' else 'accuracy'}, {where}", fontsize=9.5)
             ax.set_xlabel("epoch")
             _grid_axes(ax, "both")
             if row == 0 and col == 0:
@@ -186,9 +202,9 @@ def plot_model_comparison(table, best=None, save_to=None):
     fig, ax = plt.subplots(figsize=(8, 3.6))
     for k, name in enumerate(table.index):
         y = np.arange(len(metrics)) + (k - (len(table) - 1) / 2) * 0.18
-        label = _label(name) + ("  (best, chosen by CV)" if name == best else "")
-        ax.scatter(100 * table.loc[name, metrics].astype(float), y, s=60, color=MODEL_COLORS.get(name, INK),
-                   edgecolor=SURFACE, linewidth=1.5, zorder=3, label=label)
+        text = label(name) + ("  (best, chosen by CV)" if name == best else "")
+        ax.scatter(100 * table.loc[name, metrics].astype(float), y, s=60, color=_color(name),
+                   edgecolor=SURFACE, linewidth=1.5, zorder=3, label=text)
     ax.set_yticks(range(len(metrics)), metrics)
     ax.invert_yaxis()
     ax.set_xlabel("score (%)")
@@ -212,7 +228,7 @@ def plot_confusion_matrices(test, class_names, save_to=None):
         ax.set_yticks(range(2), class_names, rotation=90, va="center")
         ax.set_xlabel("predicted")
         ax.set_ylabel("true")
-        ax.set_title(f"{_label(name)}: accuracy {result['accuracy']:.1%}")
+        ax.set_title(f"{label(name)}: accuracy {result['accuracy']:.1%}")
         for spine in ax.spines.values():
             spine.set_visible(False)
     _finish(fig, save_to)
@@ -226,7 +242,7 @@ def plot_roc(test, positive_name="fractured", save_to=None):
     ax.plot([0, 1], [0, 1], color=GRID, linewidth=1)
     for name, r in test.items():
         fpr, tpr, _ = roc_curve(np.array(r["y_true"]) == 0, r["prob_positive"])
-        ax.plot(fpr, tpr, color=MODEL_COLORS.get(name, INK), label=f"{_label(name)} (AUC {r['auc']:.3f})")
+        ax.plot(fpr, tpr, color=_color(name), label=f"{label(name)} (AUC {r['auc']:.3f})")
     ax.set_xlabel("false positive rate")
     ax.set_ylabel(f"true positive rate ({positive_name})")
     ax.set_title("ROC on the test split")
@@ -338,7 +354,7 @@ def _overlay(ax, image, attribution, smooth=1.0):
         a = gaussian_filter(attribution, smooth) if smooth else attribution
         scale = np.percentile(np.abs(a), 99) or 1e-12
         a = np.clip(a / scale, -1, 1)
-        ax.imshow(a, cmap=DIVERGING, vmin=-1, vmax=1, alpha=0.85 * np.abs(a))
+        ax.imshow(_rgba((a + 1) / 2, DIVERGING, 0.7 * np.abs(a)))
     ax.axis("off")
 
 
@@ -368,7 +384,7 @@ def plot_scratch_vs_captum(images, attributions, index=0, save_to=None):
     for row, (name, maps) in enumerate(attributions.items()):
         captum, ours = maps["Occlusion"][index], maps["Occlusion (ours)"][index]
         v = np.abs(captum).max() or 1e-12
-        panels = [(denormalize(images[index]), "gray", 0, 1, f"{_label(name)}: image"),
+        panels = [(denormalize(images[index]), "gray", 0, 1, f"{label(name)}: image"),
                   (captum, DIVERGING, -v, v, "Captum Occlusion"),
                   (ours, DIVERGING, -v, v, "Occlusion from scratch"),
                   (np.abs(captum - ours), SEQUENTIAL, 0, v, f"|difference| (max {np.abs(captum - ours).max():.1e})")]
@@ -389,7 +405,7 @@ def plot_agreement(matrices, save_to=None):
                 ax.text(j, i, f"{m.values[i, j]:.2f}", ha="center", va="center", fontsize=8, color=INK)
         ax.set_xticks(range(len(m)), m.columns, rotation=40, ha="right", fontsize=8)
         ax.set_yticks(range(len(m)), m.index, fontsize=8)
-        ax.set_title(f"{_label(name)}: agreement between methods")
+        ax.set_title(f"{label(name)}: agreement between methods")
         for spine in ax.spines.values():
             spine.set_visible(False)
     _finish(fig, save_to)
@@ -404,7 +420,7 @@ def plot_deletion_curves(curves, save_to=None):
             auc = ((c[:, :-1] + c[:, 1:]) / 2).mean()
             ax.plot(x, c.mean(0), color=METHOD_COLORS.get(method, INK), label=f"{method} ({auc:.2f})",
                     linewidth=1.5 if method == "Random" else 2)
-        ax.set_title(f"{_label(name)}")
+        ax.set_title(f"{label(name)}")
         ax.set_xlabel("% of the image removed (most important first)")
         _grid_axes(ax, "both")
         ax.legend(fontsize=7.5, title="method (area)", title_fontsize=8)
@@ -439,9 +455,9 @@ def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, t
             box = heatmap_to_box(attribution, threshold)
             if box is not None:
                 x0, y0, x1, y1 = box.astype(int)
-                alpha[y0:y1, x0:x1] = 0.85 * heat[y0:y1, x0:x1]
+                alpha[y0:y1, x0:x1] = 0.7 * heat[y0:y1, x0:x1]
                 _draw_box(ax, box, "ours")
-            ax.imshow(heat, cmap=POSITIVE, vmin=0, vmax=1, alpha=alpha)
+            ax.imshow(_rgba(heat, POSITIVE, alpha))
             hit = "hit" if pointing_game(attribution, truth) else "miss"
             ax.text(0.03, 0.03, f"{hit}, IoU {iou(box, truth):.2f}", transform=ax.transAxes, ha="left", va="bottom",
                     fontsize=7.5, color=INK, bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
@@ -463,7 +479,7 @@ def plot_localization(tables, detector=None, save_to=None):
     for k, (name, t) in enumerate(tables.items()):
         x = np.arange(len(methods)) + (k - (len(tables) - 1) / 2) * width
         values = [t.loc[m, "hit rate (%)"] if m in t.index else np.nan for m in methods]
-        ax.bar(x, values, width * 0.92, color=MODEL_COLORS.get(name, INK), label=_label(name))
+        ax.bar(x, values, width * 0.92, color=_color(name), label=label(name))
         for xi, v in zip(x, values):
             if np.isnan(v):
                 ax.text(xi, random + 2, "n/a", ha="center", va="bottom", fontsize=7, color=INK_2)

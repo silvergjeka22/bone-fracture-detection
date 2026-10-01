@@ -73,10 +73,13 @@ def to_boxes(xyxyn, confidence, size):
     return np.column_stack([xyxyn[order] * size, confidence[order]]).astype(np.float32)
 
 
-def find_boxes(weights, paths, size, conf=0.25, imgsz=640):
+def find_boxes(weights, paths, size, conf=0.25, imgsz=640, batch=16):
     """Boxes found in each image (original files in `paths`): list of (k, 5) arrays, see `to_boxes`."""
     from ultralytics import YOLO
 
-    results = YOLO(str(weights)).predict(source=[str(p) for p in paths], conf=conf, imgsz=imgsz, stream=True,
-                                         verbose=False)
-    return [to_boxes(r.boxes.xyxyn.cpu().numpy(), r.boxes.conf.cpu().numpy(), size) for r in results]
+    detector, found = YOLO(str(weights)), []
+    for start in range(0, len(paths), batch):  # small groups: ultralytics treats a whole list as one batch
+        chunk = [str(p) for p in paths[start:start + batch]]
+        for r in detector.predict(source=chunk, conf=conf, imgsz=imgsz, verbose=False):
+            found.append(to_boxes(r.boxes.xyxyn.cpu().numpy(), r.boxes.conf.cpu().numpy(), size))
+    return found

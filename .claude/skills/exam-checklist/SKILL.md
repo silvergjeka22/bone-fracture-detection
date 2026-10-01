@@ -34,7 +34,7 @@ and exits 1 if one fails. Then walk through the manual items below.
 | - | learning curves train + val **in the same figure** | `figures/learning_curves.png` | yes |
 | - | PyTorch + Captum + Kymatio | requirements.txt | yes |
 | - | report 6-8 pages (8-10 for a pair), English, with figures | not in the repo yet | manual |
-| - | presentation <= 12 min (15 for a pair), organised sections | `presentation/main.pdf` + `SPEAKER_NOTES.md` | manual |
+| - | presentation <= 12 min (15 for a pair), organised sections | not in the repo | manual |
 | - | code must run at the oral exam | `pytest`, `./run.sh push --quick` | manual |
 
 ## Manual checks
@@ -42,6 +42,5 @@ and exits 1 if one fails. Then walk through the manual items below.
 - Read the discussion (notebook section 11, slide "Discussion and conclusions") against the
   actual numbers in `summary.json`; update any sentence the numbers contradict.
 - If filters look noisy, the exam suggests more data augmentation (`data.AUGMENT`).
-- Presentation: time it (target 11 minutes, `presentation/SPEAKER_NOTES.md`).
-- Report: 6-8 pages; reuse the figures in `results/figures/` and tables in `results/latex/`.
-- Nothing typed by hand in the slides: numbers come from `results/latex/numbers.tex`.
+- Presentation: time it (target 11 minutes).
+- Report: 6-8 pages; reuse the figures in `results/figures/` and the numbers in `results/summary.json`.

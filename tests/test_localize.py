@@ -73,14 +73,6 @@ def test_score_boxes_uses_the_most_confident_box():
     assert scores["IoU"] == pytest.approx(36 / 100 / 3, abs=1e-3)
 
 
-def test_choose_method_prefers_faithful_methods():
-    localization = pd.DataFrame({"hit rate (%)": {"LIME": 70.0, "Occlusion": 60.0, "Random": 5.0}})
-    deletion = pd.DataFrame({"deletion AUC (mean)": {"LIME": 0.8, "Occlusion": 0.3, "Random": 0.6}})
-    assert localize.choose_method(localization, deletion) == "Occlusion"  # LIME hits more but is not faithful
-    deletion.loc["Occlusion", "deletion AUC (mean)"] = 0.9                # nobody beats Random: most hits wins
-    assert localize.choose_method(localization, deletion) == "LIME"
-
-
 def test_detector_vs_xai():
     table = pd.DataFrame({"hit rate (%)": {"Occlusion": 60.0, "Random": 5.0}, "IoU": {"Occlusion": 0.2, "Random": np.nan}})
     out = localize.detector_vs_xai({"cnn": table}, {"hit rate (%)": 80.0, "IoU": 0.4}, {"cnn": "CNN"})

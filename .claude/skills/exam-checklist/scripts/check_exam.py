@@ -67,8 +67,6 @@ def main():
         check("best model chosen by cross-validation", bool(s.get("best_model")), s.get("best_model", ""))
     for name, stem in REQUIRED_FIGURES.items():
         check(f"figure: {name}", (results / "figures" / f"{stem}.png").exists())
-    check("LaTeX numbers for the slides", (results / "latex" / "numbers.tex").exists())
-    check("presentation built", (ROOT / "presentation" / "main.pdf").exists())
 
     for name, ok, detail in rows:
         print(f"{'OK  ' if ok else 'FAIL'}  {name}" + (f"  ({detail})" if detail else ""))

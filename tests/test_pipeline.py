@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from src import pipeline
+from src import pipeline, xai
 
 
 def test_verdict_needs_agreement():
@@ -42,3 +42,10 @@ def test_report_uses_original_pixels():
            "detector confidence": 0.5, "explanation agrees": False, "verdict": "fracture"}
     text = pipeline.write_report(row, original_size=(448, 224), size=224, method="Occlusion")
     assert "x 20-60, y 20-40 px" in text and "outside the detected box" in text and text.startswith("IMG1.jpg: FRACTURE")
+
+
+def test_pick_method_on_the_val_xrays(sets):
+    size = sets["val"].images.shape[1]
+    model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(size * size, 2)).eval()
+    method, table = pipeline.pick_method(model, sets["val"], ig_steps=4, window=16, stride=16, lime_samples=20)
+    assert method in xai.METHODS and "Random" in table.index and method != "Grad-CAM"  # no conv layer here

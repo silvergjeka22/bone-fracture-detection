@@ -1,12 +1,13 @@
-# Bone Fracture Detection: CNN vs ScatNet, XAI, fracture boxes and a YOLO pipeline
+# Bone Fracture Detection: CNN vs ScatNet, XAI, guided training and a YOLO pipeline
 
 MSc in Artificial Intelligence, Visual Intelligence 2025/2026, University of Verona
 
 X-rays of **FracAtlas** (fractured / not fractured, with the radiologists' fracture boxes). A CNN, a wavelet
 ScatNet and a pretrained ResNet18, all ending with **the same classifier**, are compared and explained with
 **six XAI methods** (Occlusion also written from scratch). The explanations become **fracture boxes**,
-checked against the radiologists' boxes, and a **full pipeline** after Linda (2025) combines the best
-classifier, a **YOLOv8** detector and the best XAI method into a short report per X-ray.
+checked against the radiologists' boxes. The best model is then **trained again to look at the fracture**
+(box loss + contrastive loss), and a **full pipeline** after Linda (2025) combines the classifier, a **YOLOv8**
+detector and the best XAI method into a short report per X-ray.
 
 ## Run it on Kaggle (macOS and Windows)
 
@@ -25,7 +26,7 @@ classifier, a **YOLOv8** detector and the best XAI method into a short report pe
 | | macOS, Linux, Windows Git Bash | Windows PowerShell or cmd |
 |---|---|---|
 | quick check (~5 min) | `./run.sh push --quick` | `run.bat push --quick` |
-| full run (~2-3 h on a T4) | `./run.sh push` | `run.bat push` |
+| full run (~3 h on a T4) | `./run.sh push` | `run.bat push` |
 | is it done? | `./run.sh status` | `run.bat status` |
 | download the results | `./run.sh get` | `run.bat get` |
 
@@ -46,11 +47,10 @@ classifier, a **YOLOv8** detector and the best XAI method into a short report pe
 
 Two Kaggle accounts on one computer: the one used is the `kaggle.json` in the `.kaggle` folder.
 
-## Results and slides
+## Results
 
-`results/summary.json` holds every number, `results/figures/` every figure, `results/latex/` the numbers of the
-slides. `make -C presentation` (or `./run.sh slides`) rebuilds `presentation/main.pdf` from them;
-`presentation/SPEAKER_NOTES.md` has the timing (about 11:30 of the 12 minutes).
+`results/summary.json` holds every number and `results/figures/` every figure; the end of the notebook prints
+the key findings.
 
 ## Run locally (optional)
 
@@ -82,11 +82,11 @@ src/
   xai.py               six XAI methods, deletion test, agreement
   occlusion_scratch.py Occlusion from scratch
   localize.py          heatmap -> fracture box, hit rate and IoU
+  guidance.py          guided training: box loss + contrastive loss
   detect.py            YOLOv8 on the fracture boxes
   pipeline.py          classifier + YOLO + XAI -> verdict and report
-  plots.py, report.py  figures, summary.json and the numbers of the slides
+  plots.py, report.py  figures, summary.json and the key findings
 tests/                 pytest (synthetic X-rays)
-presentation/          slides (main.tex -> main.pdf) and speaker notes
 run.sh, run.bat        Kaggle launcher (scripts/kaggle_run.py)
 kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
 ```
@@ -99,8 +99,15 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
   `flatten -> 512 -> 128 -> 2`. Best model by cross-validation F1, test set used once.
 - **XAI**: Saliency, Integrated Gradients, Guided Backprop, Grad-CAM (not on ScatNet), Occlusion, LIME;
   black = "removed". Quality: deletion test and hit rate against the radiologists' boxes.
-- **Pipeline** (Linda 2025, without CT and the graph network): YOLOv8s gives the box, the best classifier
-  decides, the best XAI method explains; if classifier and YOLO disagree, the X-ray *needs review*.
+- **Guided training**: the best model is trained again with
+  `loss = weighted CE + box x Energy loss + contrast x contrastive loss` on the fractured training X-rays:
+  the Energy loss (Rao et al. 2023) is the share of its Grad-CAM heat outside the radiologist's box; the
+  contrastive loss (SupCon, SimCLR-style) makes fracture regions alike and background different. Warm-up first,
+  boxes grown a little, Grad-CAM on the 14x14 layer. Compared with the plain model: accuracy, F1, hit rate of
+  all six XAI methods, deletion test.
+- **Pipeline** (Linda 2025, without CT and the graph network): YOLOv8s (trained separately on the boxes) gives
+  the box, the classifier decides, the XAI method explains; model and method are chosen on the val split.
+  If classifier and YOLO disagree, the X-ray *needs review*.
 
 ## Exam requirements -> where
 
@@ -112,7 +119,7 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
 | filters compared | §6 |
 | six XAI methods, 2 images per class | `src/xai.py`, §7 |
 | one method from scratch vs Captum | `src/occlusion_scratch.py`, §8 |
-| quality of the explanations, discussion | §9, §10, §13 |
+| quality of the explanations | §9, §10, §11 |
 
 `python .claude/skills/exam-checklist/scripts/check_exam.py` checks a finished run.
 
@@ -127,5 +134,7 @@ in `docs/previous_run/`. (An old Kaggle key is in the history of branch `xai`: r
 Bruna & Mallat 2013 (scattering) · Simonyan et al. 2014 (saliency) · Springenberg et al. 2015 (guided backprop)
 · Zeiler & Fergus 2014 (occlusion) · Ribeiro et al. 2016 (LIME) · Sundararajan et al. 2017 (integrated
 gradients) · Selvaraju et al. 2017 (Grad-CAM) · Samek et al. 2017 (deletion test) · Zhang et al. 2018 (pointing
-game) · Abedeen et al. 2023 (FracAtlas, *Scientific Data*) · Linda 2025 (fracture detection and reporting,
-*J. Electrical Systems*) · Captum · Kymatio · Ultralytics YOLOv8.
+game) · Ross et al. 2017 (right for the right reasons) · Li et al. 2018 (GAIN) · Rao et al. 2023 (model
+guidance with boxes, Energy loss) · Chen et al. 2020 (SimCLR) · Khosla et al. 2020 (supervised contrastive) ·
+Selvaraju et al. 2021 (CAST) · Abedeen et al. 2023 (FracAtlas, *Scientific Data*) · Linda 2025 (fracture detection
+and reporting, *J. Electrical Systems*) · Captum · Kymatio · Ultralytics YOLOv8.

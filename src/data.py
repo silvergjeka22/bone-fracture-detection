@@ -140,12 +140,10 @@ def split_indices(labels, groups, val=0.15, test=0.15, seed=0):
 
 # ----------------------------------------------------------------------------- training data
 
-# training images only: flip, small rotation / shift / zoom, brightness / contrast
-AUGMENT = v2.Compose([
-    v2.RandomHorizontalFlip(),
-    v2.RandomAffine(degrees=10, translate=(0.05, 0.05), scale=(0.9, 1.1)),
-    v2.ColorJitter(brightness=0.2, contrast=0.2),
-])
+# training images only: flip, small rotation / shift / zoom (GEOMETRY, also applied to box masks), brightness
+GEOMETRY = v2.Compose([v2.RandomHorizontalFlip(), v2.RandomAffine(degrees=10, translate=(0.05, 0.05), scale=(0.9, 1.1))])
+COLOR = v2.ColorJitter(brightness=0.2, contrast=0.2)
+AUGMENT = v2.Compose([GEOMETRY, COLOR])
 
 
 class XrayDataset(Dataset):

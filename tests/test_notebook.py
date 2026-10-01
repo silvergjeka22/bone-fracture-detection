@@ -30,7 +30,7 @@ def test_notebook_runs_end_to_end(tmp_path):
     torch.save(torchvision.models.resnet18().state_dict(), torch_home / "hub" / "checkpoints" / url.split("/")[-1])
 
     nb = nbformat.read(ROOT / "notebooks" / "main.ipynb", as_version=4)
-    settings = [c for c in nb.cells if c.cell_type == "code" and c.source.startswith("# Settings")]
+    settings = [c for c in nb.cells if c.cell_type == "code" and c.source.startswith("QUICK")]
     assert len(settings) == 1
     settings[0].source = settings[0].source.replace("QUICK      = False", "QUICK      = True")
     assert "QUICK      = True" in settings[0].source
@@ -49,15 +49,15 @@ def test_notebook_runs_end_to_end(tmp_path):
                 os.environ[k] = v
 
     summary = json.loads((results / "summary.json").read_text())
-    assert set(summary["models"]) == {"cnn", "scatnet", "resnet18"}
-    assert summary["best_model"] in summary["models"]
+    guided = [n for n in summary["models"] if n.endswith(("_box", "_box_contrast"))]
+    assert set(summary["models"]) - set(guided) == {"cnn", "scatnet", "resnet18"} and len(guided) == 2
+    assert summary["best_model"] in summary["models"] and len(summary["guided"]) == 3
     for figure in ("dataset_overview", "samples_train", "duplicates", "learning_curves", "confusion_matrices",
                    "filters_cnn", "filters_scatnet", "xai_cnn", "xai_scatnet", "occlusion_scratch_vs_captum",
                    "deletion_curves", "xai_agreement", "boxes_cnn", "boxes_scatnet", "localization",
-                   "pipeline_examples"):
+                   "pipeline_examples", "guided_localization", f"boxes_{guided[1]}"):
         assert (results / "figures" / f"{figure}.png").exists(), figure
-    assert (results / "latex" / "numbers.tex").exists()
     assert max(v["max |difference|"] for v in summary["scratch_vs_captum"].values()) < 1e-4
     assert {"cnn", "scatnet"} <= set(summary["localization"]) and "Random" in summary["localization"]["cnn"]
-    assert set(summary["pipeline"]) == {"detector", "detector_boxes", "cases", "box_method"}
+    assert set(summary["pipeline"]) == {"classifier", "detector", "detector_boxes", "cases", "box_method"}
     assert (results / "detector" / "best.pt").exists()
