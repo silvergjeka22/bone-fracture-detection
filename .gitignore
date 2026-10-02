@@ -31,3 +31,13 @@ results/attributions/
 results/detector/
 *.pth
 *.pt
+
+# LaTeX build files (the PDFs in paper/ are kept)
+*.aux
+*.log
+*.out
+*.nav
+*.snm
+*.toc
+*.fls
+*.fdb_latexmk

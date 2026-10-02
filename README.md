@@ -47,6 +47,13 @@ it with a **YOLOv8** detector and the best XAI method into a short report per X-
 
 Two Kaggle accounts on one computer: the one used is the `kaggle.json` in the `.kaggle` folder.
 
+## Paper and presentation
+
+- `paper/fracture_paper.tex` (+ PDF): the report, IEEE two-column, 8 pages.
+- `paper/presentation/fracture_presentation.tex` (+ PDF): the slides (beamer, 16:9).
+
+Both read their plots from `results/figures/`; rebuild with `pdflatex` (twice) after a new run.
+
 ## Results
 
 `results/summary.json` holds every number and `results/figures/` every figure; the end of the notebook prints
