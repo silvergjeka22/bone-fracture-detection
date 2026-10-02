@@ -35,7 +35,7 @@ def compute_metrics(y_true, probs, threshold=0.5):
         "accuracy": accuracy_score(y_true, y_pred),
         "f1": f1_score(y_true, y_pred, **kw),
         "precision": precision_score(y_true, y_pred, **kw),
-        "recall": recall_score(y_true, y_pred, **kw),                   # sensitivity: fractures found
+        "recall": recall_score(y_true, y_pred, **kw),                   
         "specificity": float(((y_pred != POSITIVE) & ~is_pos).sum() / max((~is_pos).sum(), 1)),
         "auc": roc_auc_score(is_pos, probs[:, POSITIVE]) if 0 < is_pos.sum() < len(is_pos) else float("nan"),
     }
@@ -64,7 +64,7 @@ def train_one_epoch(model, loader, optimizer, device, weight=None):
         images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
         outputs = model(images)
-        loss = criterion(outputs, labels)  # weighted mean over the batch
+        loss = criterion(outputs, labels)  
         loss.backward()
         optimizer.step()
         batch_weight = len(labels) if weight is None else weight[labels].sum().item()
@@ -213,8 +213,6 @@ def mcnemar_table(test):
     return pd.DataFrame.from_dict(rows, orient="index")
 
 
-# ----------------------------------------------------------------------------- tables and choice
-
 def _pm(mean, std):
     return f"{100 * mean:.1f} ± {100 * std:.1f}"
 
@@ -266,8 +264,6 @@ def error_table(test, class_names):
     table.attrs["wrong for every model"] = len(set.intersection(*wrong.values()))
     return table
 
-
-# ----------------------------------------------------------------------------- saving / loading
 
 def save_json(obj, path):
     path = Path(path)

@@ -18,7 +18,7 @@ def occlusion_scratch(model, x, target, window=16, stride=8, baseline=-1.0, batc
     _, _, height, width = x.shape
     base_score = model(x)[0, target]
 
-    # top-left corners of the windows; like Captum, the last window may be clipped by the border
+    # top-left corners of the windows; the last window may be clipped by the border
     rows = [i * stride for i in range(math.ceil((height - window) / stride) + 1)]
     cols = [j * stride for j in range(math.ceil((width - window) / stride) + 1)]
     corners = [(r, c) for r in rows for c in cols]

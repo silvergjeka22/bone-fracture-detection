@@ -16,9 +16,9 @@ from .localize import box_hits, evidence, heatmap_to_box, iou, pointing_game
 from .utils import patch_scipy_for_kymatio
 
 patch_scipy_for_kymatio()
-from kymatio.scattering2d.filter_bank import filter_bank  # noqa: E402
+from kymatio.scattering2d.filter_bank import filter_bank 
 
-# ----------------------------------------------------------------------------- style
+
 INK, INK_2, GRID, SURFACE, NEUTRAL = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb", "#9a998f"
 MODEL_COLORS = {"cnn": "#2a78d6", "scatnet": "#eb6834", "resnet18": "#1baf7a",
                 "separate": "#52514e", "joint": "#4a3aa7", "joint_xai": "#e87ba4"}
@@ -78,9 +78,7 @@ def _draw_box(ax, box, who):
     x0, y0, x1, y1 = box
     ax.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), x1 - x0, y1 - y0, fill=False, linewidth=1.6,
                            edgecolor=BOX_COLORS[who], linestyle="--" if who == "radiologist" else "-"))
-
-
-# ----------------------------------------------------------------------------- data
+    
 
 def show_samples(image_set, n_per_class=5, seed=0, title=None, save_to=None):
     """A row of random images per class, with the radiologists' fracture boxes."""
@@ -159,8 +157,6 @@ def show_duplicate_pairs(image_set, pairs, n=6, title=None, save_to=None):
         fig.suptitle(title)
     _finish(fig, save_to)
 
-
-# ----------------------------------------------------------------------------- training and results
 
 def plot_learning_curves(cv, final=None, save_to=None):
     """Train (grey) and validation (model colour) on the same axes: CV mean ± std, and the final training."""
@@ -250,8 +246,6 @@ def plot_roc(test, positive_name="fractured", save_to=None):
     _finish(fig, save_to)
 
 
-# ----------------------------------------------------------------------------- filters
-
 def _filter_panel(ax, kernel):
     v = np.abs(kernel).max() or 1.0
     ax.imshow(kernel, cmap=DIVERGING, vmin=-v, vmax=v)
@@ -340,8 +334,6 @@ def plot_frequency_coverage(weight, J, L, size=64, save_to=None):
     _finish(fig, save_to)
 
 
-# ----------------------------------------------------------------------------- XAI
-
 def _overlay(ax, image, attribution, smooth=1.0):
     """Grey X-ray + attribution (red = for the class, blue = against); weak values fade out."""
     ax.imshow(denormalize(image), cmap="gray", vmin=0, vmax=1)
@@ -426,8 +418,6 @@ def plot_deletion_curves(curves, save_to=None):
     fig.suptitle("Deletion test: lower = more faithful attribution")
     _finish(fig, save_to)
 
-
-# ----------------------------------------------------------------------------- fracture boxes
 
 def plot_fracture_boxes(images, maps, true_boxes, methods=None, threshold=0.5, title=None, save_to=None):
     """Rows = fractured X-rays, columns = methods: radiologist's box (dashed), our box, evidence (faint outside)."""
@@ -525,8 +515,6 @@ def plot_pipeline_examples(image_set, cases, n=4, save_to=None):
     fig.legend(handles=handles, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.02))
     _finish(fig, save_to)
 
-
-# ----------------------------------------------------------------------------- joint model
 
 def plot_joint_training(final, keys, save_to=None):
     """Per epoch: val AUC and val Grad-CAM hit rate of each version, and the loss parts of the last one."""

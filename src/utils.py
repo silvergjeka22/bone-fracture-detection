@@ -18,7 +18,7 @@ def get_device():
     """GPU if available, otherwise CPU."""
     if torch.cuda.is_available():
         try:
-            torch.ones(1, device="cuda").add_(1)  # fails if this PyTorch has no kernels for the GPU
+            torch.ones(1, device="cuda").add_(1)  
         except RuntimeError as error:
             raise RuntimeError(f"PyTorch cannot run on {torch.cuda.get_device_name(0)}: on Kaggle choose the "
                                "'GPU T4 x2' accelerator (kernel-metadata.json: machine_shape NvidiaTeslaT4).") from error

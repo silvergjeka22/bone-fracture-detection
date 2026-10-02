@@ -19,7 +19,6 @@ from scipy.stats import spearmanr
 from .data import BLACK
 from .occlusion_scratch import compare, occlusion_scratch
 
-# Captum warns on every call that it enables input gradients / hooks the ReLUs: expected, not a problem
 warnings.filterwarnings("ignore", message=".*did not already require gradients.*")
 warnings.filterwarnings("ignore", message=".*Setting backward hooks on ReLU activations.*")
 
@@ -41,8 +40,6 @@ def patch_mask(x, patch=16):
     ids = torch.arange((height // patch) * (width // patch)).reshape(height // patch, width // patch)
     return ids.repeat_interleave(patch, 0).repeat_interleave(patch, 1)[None, None].to(x.device)
 
-
-# Every method: (model, x of shape (1, 1, H, W), target class, **params) -> (H, W) map or None.
 
 def saliency(model, x, target, **_):
     return _to_map(Saliency(model).attribute(x, target=target, abs=True))
@@ -77,7 +74,6 @@ def occlusion_ours(model, x, target, baseline=BLACK, window=16, stride=8, **_):
 
 
 def lime(model, x, target, baseline=BLACK, lime_samples=1000, patch=16, **_):
-    # ridge surrogate as in the original LIME (Captum's default Lasso often zeroes every patch)
     surrogate = SkLearnRidge(alpha=1.0)
     return _to_map(Lime(model, interpretable_model=surrogate).attribute(x, target=target, baselines=baseline, feature_mask=patch_mask(x, patch),
                                          n_samples=lime_samples, perturbations_per_eval=32))
@@ -137,8 +133,6 @@ def available(maps):
     """Only the methods that could be computed (no NaN maps)."""
     return {k: v for k, v in maps.items() if not np.isnan(v).all()}
 
-
-# ----------------------------------------------------------------------------- comparing attributions
 
 @torch.no_grad()
 def deletion_curve(model, x, target, attribution, patch=16, steps=20, baseline=BLACK):

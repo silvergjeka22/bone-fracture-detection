@@ -28,8 +28,6 @@ STRIDE = 16  # one cell of the layer3 grid = 16 x 16 px
 TAU = 0.5    # temperature of the maps turned into probabilities over the cells
 
 
-# ----------------------------------------------------------------------------- data
-
 def boxes_from_masks(masks):
     """(k, S, S) masks -> (k', 4) boxes around the non-empty ones."""
     out = []
@@ -85,8 +83,6 @@ def _fractured(image_set):
     return image_set.subset([i for i in range(len(image_set)) if image_set.labels[i] == 0 and len(image_set.boxes[i])])
 
 
-# ----------------------------------------------------------------------------- losses
-
 def blur_inside(x, mask):
     """Blur the X-ray where mask = 1: thin details such as a fracture line disappear, the rough shape stays."""
     r = x.shape[-1] // 28
@@ -116,7 +112,7 @@ def spread(maps):
 def js(p, q):
     """Jensen-Shannon divergence between the rows of p and q: 0 = same map, at most log 2."""
     m = (p + q) / 2
-    kl = lambda a, b: (a * (a.clamp_min(1e-8).log() - b.clamp_min(1e-8).log())).sum(1)  # noqa: E731
+    kl = lambda a, b: (a * (a.clamp_min(1e-8).log() - b.clamp_min(1e-8).log())).sum(1)
     return ((kl(p, m) + kl(q, m)) / 2).mean()
 
 
@@ -157,8 +153,6 @@ def joint_losses(model, x, y, mask, heat, reg, centre, detect=True, point=True, 
         losses["erase"] = F.cross_entropy(logits_e, torch.cat([torch.ones_like(y[f]), torch.zeros_like(y[f])]))
     return logits, losses
 
-
-# ----------------------------------------------------------------------------- training
 
 def cam_hit_rate(model, image_set, device, batch_size=32):
     """Share (%) of fractured X-rays whose Grad-CAM peak (layer3 grid) is in a cell of the radiologist's box."""
@@ -241,8 +235,6 @@ def best_on_val(final, keys):
     return max(keys, key=lambda k: final[k]["history"]["val_auc"][final[k]["best_epoch"] - 1])
 
 
-# ----------------------------------------------------------------------------- evaluation
-
 @torch.no_grad()
 def find_boxes(model, images, device, conf=0.01, top=10, batch_size=32):
     """Boxes of the built-in detector: per image a (k, 5) array (x0, y0, x1, y1, score) in pixels, best first."""
@@ -252,7 +244,7 @@ def find_boxes(model, images, device, conf=0.01, top=10, batch_size=32):
         x = images[start:start + batch_size].to(device)
         out = model.detector(model.grid(x))
         heat = out[:, 0].sigmoid()
-        peaks = heat * (heat == F.max_pool2d(heat[:, None], 3, 1, 1)[:, 0])  # local maxima only
+        peaks = heat * (heat == F.max_pool2d(heat[:, None], 3, 1, 1)[:, 0]) 
         for h, o in zip(peaks, out):
             scores, cells = h.flatten().topk(min(top, h.numel()))
             keep = scores >= conf

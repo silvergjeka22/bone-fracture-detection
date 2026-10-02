@@ -54,7 +54,7 @@ def _pct(x):
 
 def key_findings(summary):
     """The main results in a few printed lines."""
-    label = lambda name: LABELS.get(name, name)  # noqa: E731
+    label = lambda name: LABELS.get(name, name) 
     lines = [f"Best model (highest CV {summary['select_by']}): {label(summary['best_model'])}"]
     for name, m in summary["models"].items():
         cv = f"CV F1 {_pct(m['cv_mean']['f1'])}% | " if m["cv_mean"] else ""

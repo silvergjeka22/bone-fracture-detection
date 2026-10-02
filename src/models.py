@@ -11,7 +11,7 @@ from torchvision import models as tv_models
 from .utils import count_parameters, patch_scipy_for_kymatio
 
 patch_scipy_for_kymatio()
-from kymatio.torch import Scattering2D  # noqa: E402  (needs the patch above)
+from kymatio.torch import Scattering2D 
 
 MODEL_NAMES = ("cnn", "scatnet", "resnet18")
 
@@ -119,9 +119,8 @@ class JointNet(ResNet18):
 
     def __init__(self, num_classes=2, dropout=0.5, pretrained=True):
         super().__init__(num_classes, dropout, pretrained)
-        # per cell of the layer3 grid: fracture-centre score, centre offset (x, y), box width and height in cells
         self.detector = nn.Sequential(nn.Conv2d(256, 128, 3, padding=1), nn.ReLU(), nn.Conv2d(128, 5, 1))
-        nn.init.constant_(self.detector[-1].bias[0], -2.19)  # start at p(centre) = 0.1 everywhere (CenterNet)
+        nn.init.constant_(self.detector[-1].bias[0], -2.19)
 
     def grid(self, x):
         """layer3 features (B, 256, S/16, S/16): where the classifier, the detector and Grad-CAM meet."""
