@@ -30,7 +30,7 @@ and exits 1 if one fails. Then walk through the manual items below.
 | 9 | scratch vs Captum compared | `summary.json` scratch_vs_captum, `figures/occlusion_scratch_vs_captum.png` | yes |
 | 10 | qualitative comparison per model | `figures/xai_cnn.png`, `xai_scatnet.png`, agreement, deletion test | yes |
 | 11 | attributions **overlaid**, >= 2 images per class, both models | `plots.plot_attribution_grid(indices=SHOW)`, SHOW = 2 + 2 | yes |
-| 12 | discussion: best method, method not usable on a model | notebook section 11; Grad-CAM not applicable to ScatNet | manual |
+| 12 | discussion: best method, method not usable on a model | notebook sections 9-12; Grad-CAM not applicable to ScatNet | manual |
 | - | learning curves train + val **in the same figure** | `figures/learning_curves.png` | yes |
 | - | PyTorch + Captum + Kymatio | requirements.txt | yes |
 | - | report 6-8 pages (8-10 for a pair), English, with figures | not in the repo yet | manual |
@@ -39,8 +39,8 @@ and exits 1 if one fails. Then walk through the manual items below.
 
 ## Manual checks
 
-- Read the discussion (notebook section 11, slide "Discussion and conclusions") against the
-  actual numbers in `summary.json`; update any sentence the numbers contradict.
+- Read the discussion (notebook sections 9-12 and the recap) against the actual numbers in `summary.json`;
+  update any sentence the numbers contradict.
 - If filters look noisy, the exam suggests more data augmentation (`data.AUGMENT`).
 - Presentation: time it (target 11 minutes).
 - Report: 6-8 pages; reuse the figures in `results/figures/` and the numbers in `results/summary.json`.

@@ -49,3 +49,35 @@ def test_pick_method_on_the_val_xrays(sets):
     model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(size * size, 2)).eval()
     method, table = pipeline.pick_method(model, sets["val"], ig_steps=4, window=16, stride=16, lime_samples=20)
     assert method in xai.METHODS and "Random" in table.index and method != "Grad-CAM"  # no conv layer here
+
+
+def yolo_and_cam():
+    cam = np.zeros((64, 64))
+    cam[40:50, 40:50] = 1                                                        # the classifier looks bottom-right
+    found = np.array([[0, 0, 10, 10, 0.9], [38, 38, 52, 52, 0.4]], np.float32)  # YOLO prefers the top-left box
+    return found, cam
+
+
+def test_fuse_lets_the_classifier_pick_yolos_box():
+    found, cam = yolo_and_cam()
+    (same,) = pipeline.fuse([found], [cam], [0.8], alpha=0.0)
+    np.testing.assert_array_equal(same[:, :4], found[:, :4])                    # weight 0 = YOLO's own order
+    (picked,) = pipeline.fuse([found], [cam], [0.8], alpha=0.5)
+    np.testing.assert_array_equal(picked[0, :4], found[1, :4])
+    assert picked[0, 4] == pytest.approx(0.8 * 0.4 ** 0.5)
+    assert len(pipeline.fuse([found], [cam], [0.2], alpha=0.5, threshold=0.5)[0]) == 0  # called healthy: no boxes
+
+
+def test_choose_alpha_on_val_hits():
+    found, cam = yolo_and_cam()
+    alpha, hits = pipeline.choose_alpha([found], [cam], [0.8], [np.array([[40, 40, 50, 50.0]])])
+    assert hits[0.0] == 0 and hits[1.0] == 100 and alpha == 0.25  # the smallest weight with the most hits
+
+
+def test_fusion_table_counts_false_boxes_on_healthy_xrays():
+    truth = [np.array([[40, 40, 50, 50.0]]), np.zeros((0, 4))]  # one fractured, one healthy X-ray
+    yolo = [np.array([[0, 0, 10, 10, 0.9]], np.float32), np.array([[5, 5, 15, 15, 0.8]], np.float32)]
+    fused = [np.array([[40, 40, 50, 50, 0.5]], np.float32), np.zeros((0, 5), np.float32)]
+    table = pipeline.fusion_table({"YOLO": yolo, "fused": fused}, truth, 64)
+    assert table.loc["YOLO", "hit rate (%)"] == 0 and table.loc["fused", "hit rate (%)"] == 100
+    assert table.loc["YOLO", "AP@0.5, all X-rays (%)"] == 0 and table.loc["fused", "AP@0.5, all X-rays (%)"] == 100

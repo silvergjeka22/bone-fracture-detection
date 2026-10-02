@@ -53,11 +53,13 @@ def test_notebook_runs_end_to_end(tmp_path):
     assert set(summary["models"]) == {"cnn", "scatnet", "resnet18", "separate", "joint", "joint_xai"}
     assert summary["best_model"] in summary["models"] and len(summary["joint"]["comparison"]) == 3
     assert "Grad-CAM" in summary["joint"]["hit_tests"] and summary["pipeline"]["classifier"] in summary["models"]
+    assert len(summary["fusion"]["table"]) == 3 and str(summary["fusion"]["alpha"]) in summary["fusion"]["val_hits"]
     for figure in ("dataset_overview", "samples_train", "duplicates", "learning_curves", "confusion_matrices",
                    "filters_cnn", "filters_scatnet", "xai_cnn", "xai_scatnet", "occlusion_scratch_vs_captum",
                    "deletion_curves", "xai_agreement", "boxes_cnn", "boxes_scatnet", "localization",
                    "pipeline_examples", "joint_training", "joint_localization", "erase_test", "xai_joint_xai",
-                   "boxes_joint_xai", "joint_examples"):
+                   "boxes_joint_xai", "joint_examples", "fusion_examples", "final_scoreboard", "confusion_joint",
+                   "roc_joint", "fusion_scores", "test_gallery", "mistakes"):
         assert (results / "figures" / f"{figure}.png").exists(), figure
     assert max(v["max |difference|"] for v in summary["scratch_vs_captum"].values()) < 1e-4
     assert {"cnn", "scatnet"} <= set(summary["localization"]) and "Random" in summary["localization"]["cnn"]

@@ -23,7 +23,7 @@ def _json(value):
 
 
 def build_summary(settings, dataset, duplicates, cv, final, test, best, select_by, mcnemar, deletion, seconds,
-                  scratch, localization=None, joint=None, pipeline=None):
+                  scratch, localization=None, joint=None, fusion=None, pipeline=None):
     """All results in one JSON-friendly dict (the joint versions have no cross-validation)."""
     models = {name: {"cv_mean": cv.get(name, {}).get("mean"), "cv_std": cv.get(name, {}).get("std"),
                      "test": {k: t[k] for k in METRICS}, "test_accuracy_ci": t["accuracy_ci"],
@@ -35,7 +35,7 @@ def build_summary(settings, dataset, duplicates, cv, final, test, best, select_b
     return _json({"settings": settings, "dataset": dataset, "duplicates": duplicates, "best_model": best,
                   "select_by": select_by, "models": models, "mcnemar": mcnemar, "xai": xai,
                   "scratch_vs_captum": scratch, "localization": localization or {}, "joint": joint,
-                  "pipeline": pipeline})
+                  "fusion": fusion, "pipeline": pipeline})
 
 
 def export(results_dir, **parts):
@@ -82,6 +82,13 @@ def key_findings(summary):
                      f"{-row['p(fractured) drop, fracture blurred']:+.0f} points")
     for method, row in joint.get("hit_tests", {}).items():
         lines.append(f"  hit rate A -> C, {method}: {row['hits A']} -> {row['hits C']} X-rays (McNemar p = {row['p-value']})")
+    fusion = summary.get("fusion") or {}
+    if fusion:
+        lines.append(f"  YOLO proposes, C decides (Grad-CAM weight {fusion['alpha']}, chosen on val):")
+    for name, row in fusion.get("table", {}).items():
+        lines.append(f"    {name}: box on the fracture {row['hit rate (%)']:.0f}% (McNemar p = "
+                     f"{row['McNemar p vs the first row']}), AP@0.5 {row['AP@0.5, fractured X-rays (%)']:.1f}% "
+                     f"(all X-rays {row['AP@0.5, all X-rays (%)']:.1f}%)")
     pipe = summary.get("pipeline")
     if pipe:
         lines.append(f"  YOLO: mAP@0.5 {_pct(pipe['detector']['mAP@0.5'])}% (FracAtlas paper 56.2%), "

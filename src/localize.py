@@ -87,12 +87,25 @@ def localization_table(maps, true_boxes, threshold=THRESHOLD, smooth=SMOOTH):
     return table.round({"hit rate (%)": 1, "IoU": 3, "box size (%)": 1})
 
 
+def box_hits(boxes, true_boxes):
+    """Per X-ray: is the centre of its first (most confident) box inside one of its true boxes?"""
+    return np.array([len(b) > 0 and _inside((b[0, 0] + b[0, 2]) / 2, (b[0, 1] + b[0, 3]) / 2, t)
+                     for b, t in zip(boxes, true_boxes)], dtype=bool)
+
+
+def mcnemar_hits(a, b):
+    """Exact McNemar test on paired hits of the same X-rays: only a, only b, p-value (is the gain real?)."""
+    a, b = np.asarray(a, bool), np.asarray(b, bool)
+    only_a, only_b = int((a & ~b).sum()), int((b & ~a).sum())
+    p = binomtest(min(only_a, only_b), only_a + only_b, 0.5).pvalue if only_a + only_b else 1.0
+    return only_a, only_b, round(float(p), 4)
+
+
 def score_boxes(boxes, true_boxes, shape):
     """Hit rate, IoU and box size of predicted boxes (the most confident box of each image)."""
     top = [b[0, :4] if len(b) else None for b in boxes]
-    hits = [b is not None and _inside((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, t) for b, t in zip(top, true_boxes)]
     area = shape[0] * shape[1]
-    return {"hit rate (%)": round(100 * float(np.mean(hits)), 1),
+    return {"hit rate (%)": round(100 * float(np.mean(box_hits(boxes, true_boxes))), 1),
             "IoU": round(float(np.mean([iou(b, t) for b, t in zip(top, true_boxes)])), 3),
             "box size (%)": round(100 * float(np.mean([0.0 if b is None else (b[2] - b[0]) * (b[3] - b[1]) / area
                                                         for b in top])), 1)}
@@ -142,8 +155,7 @@ def compare_hits(maps_a, maps_b, true_boxes, names=("A", "C"), smooth=SMOOTH):
             continue
         a = np.array([pointing_game(m, t, smooth) for m, t in zip(maps_a[method], true_boxes)])
         b = np.array([pointing_game(m, t, smooth) for m, t in zip(maps_b[method], true_boxes)])
-        only_a, only_b = int((a & ~b).sum()), int((b & ~a).sum())
-        p = binomtest(min(only_a, only_b), only_a + only_b, 0.5).pvalue if only_a + only_b else 1.0
+        only_a, only_b, p = mcnemar_hits(a, b)
         rows[method] = {f"hits {names[0]}": int(a.sum()), f"hits {names[1]}": int(b.sum()),
-                        f"only {names[0]}": only_a, f"only {names[1]}": only_b, "p-value": round(float(p), 4)}
+                        f"only {names[0]}": only_a, f"only {names[1]}": only_b, "p-value": p}
     return pd.DataFrame(rows).T

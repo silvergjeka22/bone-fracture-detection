@@ -95,3 +95,10 @@ def test_agreement_and_compare_hits():
     assert localize.agreement([on, on], found, smooth=0) == 50  # no box: no agreement
     table = localize.compare_hits({"M": np.stack([off, off])}, {"M": np.stack([on, on])}, truth, smooth=0)
     assert table.loc["M", "hits A"] == 0 and table.loc["M", "hits C"] == 2 and table.loc["M", "only C"] == 2
+
+
+def test_box_hits_and_mcnemar():
+    truth = [np.array([[10, 10, 20, 20.0]])] * 3
+    found = [np.array([[12, 12, 18, 18, 0.9]]), np.array([[40, 40, 50, 50, 0.9]]), np.zeros((0, 5))]
+    np.testing.assert_array_equal(localize.box_hits(found, truth), [True, False, False])
+    assert localize.mcnemar_hits([True, False, False], [True, True, True])[:2] == (0, 2)

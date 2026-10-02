@@ -21,6 +21,10 @@ def parts():
                 mcnemar=pd.DataFrame({"p-value": [0.03]}, index=["cnn vs resnet18"]), deletion=deletion,
                 seconds={"cnn": {"Occlusion": 0.5}}, scratch=pd.DataFrame({"max |difference|": [1e-7]}, index=["cnn"]),
                 localization={"cnn": hits}, joint=dict(comparison=comparison, hit_tests=hit_tests),
+                fusion={"alpha": 0.5, "table": pd.DataFrame({"hit rate (%)": [76.0, 82.0], "McNemar p vs the first row": [1.0, 0.04],
+                                                             "AP@0.5, fractured X-rays (%)": [50.7, 53.0],
+                                                             "AP@0.5, all X-rays (%)": [45.0, 52.0]},
+                                                            index=["YOLO alone", "YOLO + C, re-ranked"])},
                 pipeline={"classifier": "joint_xai", "box_method": "Occlusion",
                           "detector": {"mAP@0.5": 0.58}, "detector_boxes": {"hit rate (%)": 70.0},
                           "cases": {"needs review (%)": 12.0}})
@@ -33,3 +37,4 @@ def test_export_writes_summary_and_findings(tmp_path):
     assert summary["xai"]["cnn"]["deletion_auc"]["Occlusion"] == 0.2
     text = report.key_findings(summary)
     assert "C: joint + XAI" in text and "mAP@0.5 58.0%" in text and "Occlusion 40%" in text and "10 -> 20" in text
+    assert "Grad-CAM weight 0.5" in text and "YOLO + C, re-ranked: box on the fracture 82%" in text

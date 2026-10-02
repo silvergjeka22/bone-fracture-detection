@@ -12,7 +12,7 @@ from matplotlib.patches import Rectangle
 from scipy.ndimage import gaussian_filter
 
 from .data import denormalize
-from .localize import evidence, heatmap_to_box, iou, pointing_game
+from .localize import box_hits, evidence, heatmap_to_box, iou, pointing_game
 from .utils import patch_scipy_for_kymatio
 
 patch_scipy_for_kymatio()
@@ -593,4 +593,145 @@ def plot_erase_test(erase, save_to=None):
     ax.set_title("Does the model use the fracture? Blur it and look at the answer")
     _grid_axes(ax)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(erase))
+    _finish(fig, save_to)
+
+
+def plot_fusion_examples(images, yolo, fused, cams, true_boxes, n=4, save_to=None):
+    """Fractured X-rays (first those where the classifier fixed YOLO): YOLO's best box vs the box the classifier chose."""
+    fixed = box_hits(fused, true_boxes) & ~box_hits(yolo, true_boxes)
+    rows = [*np.flatnonzero(fixed), *np.flatnonzero(~fixed)][:n]
+    fig, axes = plt.subplots(len(rows), 2, figsize=(5.6, 2.8 * len(rows)), squeeze=False)
+    for r, (ax_row, i) in enumerate(zip(axes, rows)):
+        for col, (found, title) in enumerate(((yolo[i], "YOLO alone: best box"), (fused[i], "YOLO + C: chosen box"))):
+            ax = ax_row[col]
+            ax.imshow(denormalize(images[i]), cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            if col == 1:  # the classifier's Grad-CAM, which re-ranks YOLO's boxes
+                heat = evidence(cams[i])
+                heat = (heat - heat.min()) / ((heat.max() - heat.min()) or 1)
+                ax.imshow(_rgba(heat, POSITIVE, 0.5 * heat))
+            for box in true_boxes[i]:
+                _draw_box(ax, box, "radiologist")
+            if len(found):
+                _draw_box(ax, found[0, :4], "detector")
+            hit = box_hits([found], [true_boxes[i]])[0]
+            ax.text(0.03, 0.03, "hit" if hit else "miss", transform=ax.transAxes, fontsize=8, color=INK,
+                    bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
+            if r == 0:
+                ax.set_title(title, fontsize=9.5)
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["detector"], label="box shown")]
+    fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.02))
+    _finish(fig, save_to)
+
+
+# ----------------------------------------------------------------------------- results in pictures
+
+def _tag(ax, text):
+    ax.text(0.03, 0.03, text, transform=ax.transAxes, fontsize=8, color=INK,
+            bbox=dict(facecolor=SURFACE, edgecolor="none", alpha=0.85, pad=1.5))
+
+
+def _heat(ax, attribution, alpha=0.6):
+    """The positive evidence of a map over the X-ray: weakest transparent, strongest red."""
+    heat = evidence(attribution)
+    heat = (heat - heat.min()) / ((heat.max() - heat.min()) or 1)
+    ax.imshow(_rgba(heat, POSITIVE, alpha * heat))
+
+
+def plot_scoreboard(test, names, save_to=None):
+    """Accuracy, F1, fractures found and healthy X-rays called healthy, for every model on the same test X-rays."""
+    metrics = (("accuracy", "accuracy"), ("f1", "F1"), ("recall", "fractures found"),
+               ("specificity", "healthy called healthy"))
+    width = 0.8 / len(names)
+    fig, ax = plt.subplots(figsize=(9.5, 3.8))
+    for k, name in enumerate(names):
+        x = np.arange(len(metrics)) + (k - (len(names) - 1) / 2) * width
+        ax.bar(x, [100 * test[name][m] for m, _ in metrics], width * 0.92, color=_color(name), label=label(name))
+    ax.set_xticks(range(len(metrics)), [text for _, text in metrics])
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("test (%)")
+    ax.set_title("Every model on the same test X-rays")
+    _grid_axes(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(names))
+    _finish(fig, save_to)
+
+
+def plot_fusion_scores(table, save_to=None):
+    """YOLO alone vs YOLO + model C: box on the fracture and AP@0.5 (fractured X-rays, all X-rays), value on each bar."""
+    metrics = (("hit rate (%)", "box on the fracture"), ("AP@0.5, fractured X-rays (%)", "AP@0.5, fractured"),
+               ("AP@0.5, all X-rays (%)", "AP@0.5, all X-rays"))
+    colors = (NEUTRAL, "#4a3aa7", "#e87ba4")
+    width = 0.8 / len(table)
+    fig, ax = plt.subplots(figsize=(8.5, 3.8))
+    for k, (name, row) in enumerate(table.iterrows()):
+        x = np.arange(len(metrics)) + (k - (len(table) - 1) / 2) * width
+        values = [float(row[m]) for m, _ in metrics]
+        ax.bar(x, values, width * 0.92, color=colors[k % len(colors)], label=name)
+        for xi, v in zip(x, values):
+            ax.text(xi, v + 1.5, f"{v:.0f}", ha="center", va="bottom", fontsize=8, color=INK_2)
+    ax.set_xticks(range(len(metrics)), [text for _, text in metrics])
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("test (%)")
+    ax.set_title("Can YOLO + model C beat YOLO alone?")
+    _grid_axes(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=len(table))
+    _finish(fig, save_to)
+
+
+def plot_test_gallery(images, maps, boxes, true_boxes, n=6, seed=0, save_to=None):
+    """Random fractured test X-rays (not picked by hand): where each map points, which box each finder draws."""
+    rows = np.sort(np.random.default_rng(seed).choice(len(images), min(n, len(images)), replace=False))
+    cols = [*maps, *boxes]
+    fig, axes = plt.subplots(len(rows), len(cols), figsize=(2.4 * len(cols), 2.5 * len(rows)), squeeze=False)
+    for r, i in enumerate(rows):
+        for c, name in enumerate(cols):
+            ax = axes[r, c]
+            ax.imshow(denormalize(images[i]), cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            if name in maps:
+                _heat(ax, maps[name][i])
+                hit = pointing_game(maps[name][i], true_boxes[i])
+            else:
+                found = boxes[name][i]
+                if len(found):
+                    _draw_box(ax, found[0, :4], "detector")
+                hit = box_hits([found], [true_boxes[i]])[0]
+            for box in true_boxes[i]:
+                _draw_box(ax, box, "radiologist")
+            _tag(ax, "hit" if hit else "miss")
+            if r == 0:
+                ax.set_title(name, fontsize=9.5)
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["detector"], label="detector's box"),
+               Line2D([], [], color="#e34948", linewidth=6, label="where the model looks")]
+    fig.legend(handles=handles, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
+    _finish(fig, save_to)
+
+
+def plot_mistakes(image_set, probs, threshold, cams, boxes, n=3, save_to=None):
+    """The classifier's surest mistakes: missed fractures (lowest p) and false alarms (highest p), its map, YOLO's box."""
+    p, y = np.asarray(probs, dtype=float), image_set.labels
+    kinds = (("missed fracture", [i for i in np.argsort(p) if y[i] == 0 and p[i] < threshold][:n]),
+             ("false alarm", [i for i in np.argsort(-p) if y[i] != 0 and p[i] >= threshold][:n]))
+    fig, axes = plt.subplots(2, n, figsize=(2.7 * n, 5.9), squeeze=False)
+    for r, (kind, picked) in enumerate(kinds):
+        for c in range(n):
+            ax = axes[r, c]
+            ax.axis("off")
+            if c >= len(picked):
+                continue
+            i = picked[c]
+            ax.imshow(image_set.images[i], cmap="gray", vmin=0, vmax=255)
+            _heat(ax, cams[i])
+            for box in image_set.boxes[i]:
+                _draw_box(ax, box, "radiologist")
+            if len(boxes[i]):
+                _draw_box(ax, boxes[i][0, :4], "detector")
+            ax.set_title(f"{kind}, p = {p[i]:.2f}", fontsize=9.5, color="#d03b3b")
+    handles = [Line2D([], [], color=BOX_COLORS["radiologist"], linestyle="--", label="radiologist's box"),
+               Line2D([], [], color=BOX_COLORS["detector"], label="YOLO's box"),
+               Line2D([], [], color="#e34948", linewidth=6, label="where the model looks")]
+    fig.legend(handles=handles, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("Model C's surest mistakes on the test X-rays" + ("" if kinds[0][1] or kinds[1][1] else ": none"))
     _finish(fig, save_to)

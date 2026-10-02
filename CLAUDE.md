@@ -1,9 +1,9 @@
 # CLAUDE.md
 
 Exam project (Visual Intelligence, UniVR 2025/26): fracture classification on FracAtlas, CNN vs ScatNet
-(+ ResNet18), six XAI methods (Occlusion also from scratch), XAI maps -> fracture boxes (`localize.py`), guided
-training of the best model (`guidance.py`), and a pipeline after Linda (2025): best classifier + YOLOv8
-(`detect.py`) + best XAI -> report (`pipeline.py`).
+(+ ResNet18), six XAI methods (Occlusion also from scratch), XAI maps -> fracture boxes (`localize.py`), our joint
+model (`joint.py`: classifier + built-in detector + XAI losses), YOLO proposes / model C decides (`pipeline.fuse`),
+and a pipeline after Linda (2025): best classifier + YOLOv8 (`detect.py`) + best XAI -> report (`pipeline.py`).
 Exam requirements: `.claude/skills/exam-checklist/SKILL.md`.
 
 ## Rules
@@ -13,10 +13,11 @@ Exam requirements: `.claude/skills/exam-checklist/SKILL.md`.
 - Every model ends with `models.Classifier` (same classifier; `tests/test_models.py` enforces it).
 - Images: grey, 1 channel, [-1, 1]; black = `data.BLACK` = -1 is the XAI baseline.
 - Class 0 = `fractured` is the positive class; the loss is weighted (1 in 6 fractured).
-- Boxes are `(x0, y0, x1, y1)` in pixels of the 224x224 image (`ImageSet.boxes`).
+- Boxes are `(x0, y0, x1, y1)` in pixels of the loaded image: 224 px, 448 px for the joint model (`ImageSet.boxes`).
 - `ultralytics` is imported only inside `detect.py` functions (unit tests use a fake one).
 - Figures: one function each in `plots.py`, saved as `FIG_DIR / "<name>.png"`; numbers in `results/summary.json`.
-- Guided training (`guidance.py`): weighted CE + box * Energy loss (Grad-CAM in the true box) + contrast * SupCon loss.
+- Joint model (`joint.py`, `models.JointNet`): CE + detect * CenterNet + point * Grad-CAM in the box + agree *
+  (Grad-CAM = detector map = mirrored X-ray) + erase * blur test; A / B / C = none / detect / all; Grad-CAM on layer3.
 - `utils.patch_scipy_for_kymatio()` before `import kymatio`.
 
 ## Commands

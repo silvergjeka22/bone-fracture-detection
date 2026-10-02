@@ -110,9 +110,13 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
 - **Does XAI help?** A = classifier only (its detector is YOLO), B = classifier + detector, C = B + XAI losses,
   on the same test X-rays: accuracy, F1, detector AP@0.5, hit rate of all six XAI methods (McNemar A vs C),
   deletion test, blur test, how often Grad-CAM falls inside the detector's box.
-- **Pipeline** (Linda 2025, without CT and the graph network): YOLOv8s (trained separately on the boxes) gives
-  the box, the best version decides, the XAI method explains; version and method are chosen on the val split.
-  If classifier and YOLO disagree, the X-ray *needs review*.
+- **Beat YOLO: YOLO proposes, model C decides.** YOLO gives its 10 best boxes; C scores each one with
+  `p(fractured) x YOLO confidence^(1 - a) x (C's Grad-CAM inside the box)^a` and keeps the best; X-rays C calls
+  healthy lose their boxes. The weight `a` is chosen on the val X-rays (`a = 0` is YOLO's own order). Compared with
+  YOLO alone on the same test X-rays: hit rate (McNemar), IoU, AP@0.5 on the fractured and on all X-rays.
+- **Pipeline** (Linda 2025, without CT and the graph network): the best version decides, YOLO is the second
+  opinion, the box shown is the one C chose among YOLO's confident boxes, the XAI method explains; version, weight
+  and method are chosen on the val split. If classifier and YOLO disagree, the X-ray *needs review*.
 
 ## Exam requirements -> where
 
@@ -124,7 +128,7 @@ kernel-metadata.json   Kaggle settings: T4 GPU, internet, FracAtlas attached
 | filters compared | §6 |
 | six XAI methods, 2 images per class | `src/xai.py`, §7 |
 | one method from scratch vs Captum | `src/occlusion_scratch.py`, §8 |
-| quality of the explanations | §9, §10, §11, §12 |
+| quality of the explanations | §9-§13 |
 
 `python .claude/skills/exam-checklist/scripts/check_exam.py` checks a finished run.
 

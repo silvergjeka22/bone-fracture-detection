@@ -18,7 +18,7 @@ description: Run this project's notebook (notebooks/main.ipynb) on a Kaggle GPU 
 ## Workflow
 
 1. `./run.sh push --quick`, then `./run.sh status` until complete, then `./run.sh get`.
-2. `./run.sh push` (full run, ~2-3 h), later `./run.sh get`.
+2. `./run.sh push` (full run, ~6 h), later `./run.sh get`.
 3. Commit `results/` (models, attributions, detector are gitignored), run the exam checklist.
 
 The sandbox may not reach kaggle.com: then the user runs these commands; say so instead of retrying.

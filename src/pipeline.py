@@ -1,5 +1,6 @@
 """Full pipeline after Linda (2025): classifier + YOLO box + explanation -> verdict and report per X-ray.
 
+YOLO proposes, the classifier decides: YOLO's candidate boxes are re-ranked with the classifier's Grad-CAM (fuse).
 Verdict: 'fracture' / 'no fracture' when classifier and detector agree, otherwise 'needs review'.
 """
 
@@ -8,7 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .localize import heatmap_to_box, localization_table, pointing_game
+from .localize import (average_precision, box_hits, evidence, heatmap_to_box, localization_table, mcnemar_hits,
+                       pointing_game, score_boxes)
 from .xai import DEFAULT_PARAMS, METHODS, explain_all
 
 VERDICTS = ("fracture", "no fracture", "needs review")
@@ -21,6 +23,55 @@ def verdict(p_fractured, has_box, threshold=0.5):
     if p_fractured < threshold and not has_box:
         return "no fracture"
     return "needs review"
+
+
+def box_heat(cam, boxes):
+    """Strongest evidence of the map inside each box, as a share of its strongest evidence anywhere (0 to 1)."""
+    heat = evidence(cam)
+    heat = heat / (heat.max() or 1)
+    rows, cols = heat.shape
+    out = []
+    for x0, y0, x1, y1 in np.asarray(boxes, dtype=float).reshape(-1, 4):
+        c0, r0 = int(np.clip(x0, 0, cols - 1)), int(np.clip(y0, 0, rows - 1))
+        out.append(heat[r0:max(int(np.ceil(y1)), r0 + 1), c0:max(int(np.ceil(x1)), c0 + 1)].max())
+    return np.array(out)
+
+
+def fuse(detections, cams, p_fractured, alpha=0.5, threshold=None, top=10):
+    """YOLO proposes, the classifier decides: score = p(fractured) x conf^(1 - alpha) x heat^alpha, best box first.
+
+    heat = the classifier's Grad-CAM inside the box (box_heat); with `threshold`, X-rays called healthy lose their boxes.
+    """
+    fused = []
+    for found, cam, p in zip(detections, cams, p_fractured):
+        found = found[np.argsort(-found[:, 4], kind="stable")][:top]  # YOLO's candidates
+        if len(found) == 0 or (threshold is not None and p < threshold):
+            fused.append(np.zeros((0, 5), np.float32))
+            continue
+        score = p * found[:, 4] ** (1 - alpha) * box_heat(cam, found[:, :4]) ** alpha
+        order = np.argsort(-score, kind="stable")
+        fused.append(np.column_stack([found[order, :4], score[order]]).astype(np.float32))
+    return fused
+
+
+def choose_alpha(detections, cams, p_fractured, true_boxes, grid=(0.0, 0.25, 0.5, 0.75, 1.0)):
+    """Weight of the Grad-CAM with the most hits on fractured (val) X-rays; 0 = YOLO's own order wins ties."""
+    hits = {a: 100 * float(box_hits(fuse(detections, cams, p_fractured, a), true_boxes).mean()) for a in grid}
+    return max(grid, key=lambda a: (hits[a], -a)), hits
+
+
+def fusion_table(candidates, true_boxes, size):
+    """Per box finder: hit rate and IoU on the fractured X-rays, McNemar vs the first row, AP@0.5 (fractured / all)."""
+    frac = [i for i, t in enumerate(true_boxes) if len(t)]
+    truth, rows, first = [true_boxes[i] for i in frac], {}, None
+    for name, found in candidates.items():
+        on_frac = [found[i] for i in frac]
+        hits = box_hits(on_frac, truth)
+        first = hits if first is None else first
+        rows[name] = {**score_boxes(on_frac, truth, (size, size)), "McNemar p vs the first row": mcnemar_hits(first, hits)[2],
+                      "AP@0.5, fractured X-rays (%)": round(100 * average_precision(on_frac, truth), 1),
+                      "AP@0.5, all X-rays (%)": round(100 * average_precision(found, true_boxes), 1)}
+    return pd.DataFrame(rows).T
 
 
 def pick_method(model, val_set, threshold=0.5, **params):
