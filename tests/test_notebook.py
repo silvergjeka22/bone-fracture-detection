@@ -29,7 +29,7 @@ def test_notebook_runs_end_to_end(tmp_path):
     (torch_home / "hub" / "checkpoints").mkdir(parents=True)
     torch.save(torchvision.models.resnet18().state_dict(), torch_home / "hub" / "checkpoints" / url.split("/")[-1])
 
-    nb = nbformat.read(ROOT / "notebooks" / "main.ipynb", as_version=4)
+    nb = nbformat.read(ROOT / "notebooks" / "bone-fracture-detection.ipynb", as_version=4)
     settings = [c for c in nb.cells if c.cell_type == "code" and c.source.startswith("QUICK")]
     assert len(settings) == 1
     settings[0].source = settings[0].source.replace("QUICK      = False", "QUICK      = True")

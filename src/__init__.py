@@ -1,6 +1,6 @@
 """Bone fracture detection: CNN vs ScatNet (+ ResNet18) with explainable AI.
 
-Modules, in the order the notebook (notebooks/main.ipynb) uses them:
+Modules, in the order the notebook (notebooks/bone-fracture-detection.ipynb) uses them:
     bootstrap          Kaggle or local setup: packages, dataset path, output folders
     data               load + cache FracAtlas (X-rays + fracture boxes), near-duplicates, grouped split, loaders
     models             BoneFractureCNN, ScatNet, ResNet18, JointNet, all ending in the same Classifier

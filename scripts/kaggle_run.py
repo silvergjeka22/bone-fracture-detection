@@ -1,4 +1,4 @@
-"""Run notebooks/main.ipynb on a Kaggle GPU and download the results (macOS, Linux and Windows).
+"""Run notebooks/bone-fracture-detection.ipynb on a Kaggle GPU and download the results (macOS, Linux and Windows).
 
     push [--quick] [--user NAME]   pack src/ into the notebook and start it on YOUR Kaggle account
     status                         is it running, finished or failed?
@@ -90,7 +90,7 @@ def build(stage, quick, user, root=ROOT):
             bundle.writestr(path.relative_to(root).as_posix(), text)
     code = base64.b64encode(packed.getvalue()).decode()
 
-    notebook = json.loads((root / "notebooks" / "main.ipynb").read_text(encoding="utf-8"))
+    notebook = json.loads((root / "notebooks" / f"{SLUG}.ipynb").read_text(encoding="utf-8"))
     switched = 0
     for cell in notebook["cells"]:
         if cell["cell_type"] == "code":
@@ -107,10 +107,10 @@ def build(stage, quick, user, root=ROOT):
                    f'zipfile.ZipFile(io.BytesIO(base64.b64decode("{code}"))).extractall("{UNPACK}")')})
 
     metadata = json.loads((root / "kernel-metadata.json").read_text(encoding="utf-8"))
-    metadata.update(id=f"{user}/{SLUG}", title=SLUG, code_file="main.ipynb")
+    metadata.update(id=f"{user}/{SLUG}", title=SLUG, code_file=f"{SLUG}.ipynb")
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True)
-    (stage / "main.ipynb").write_text(json.dumps(notebook, ensure_ascii=False), encoding="utf-8")
+    (stage / f"{SLUG}.ipynb").write_text(json.dumps(notebook, ensure_ascii=False), encoding="utf-8")
     (stage / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return metadata["id"]
 
