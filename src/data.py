@@ -19,17 +19,15 @@ from sklearn.model_selection import StratifiedGroupKFold
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import v2
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True  # tolerate truncated JPEG files
+ImageFile.LOAD_TRUNCATED_IMAGES = True  
 
 IMAGE_SIZE = 224
 CLASS_FOLDERS = ("Fractured", "Non_fractured")   # label 0, label 1
 CLASS_NAMES = ["fractured", "not fractured"]
 IMG_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
-MEAN, STD = 0.5, 0.5   # pixels [0, 1] -> [-1, 1]
-BLACK = -1.0           # a black pixel after normalisation: the "removed" value used by the XAI methods
+MEAN, STD = 0.5, 0.5   
+BLACK = -1.0           
 
-
-# ----------------------------------------------------------------------------- loading
 
 def find_data_dir(root):
     """First folder under `root` (itself included) that has images/Fractured and images/Non_fractured."""
@@ -38,7 +36,7 @@ def find_data_dir(root):
         if all((Path(dirpath) / "images" / folder).is_dir() for folder in CLASS_FOLDERS):
             return Path(dirpath)
         if len(Path(dirpath).relative_to(root).parts) >= 5:
-            dirnames[:] = []  # do not walk deeper
+            dirnames[:] = []  
     raise FileNotFoundError(
         f"No folder with images/Fractured and images/Non_fractured found under {root}. On Kaggle, attach the "
         "dataset 'mahmudulhasantasin/fracatlas-original-dataset'; locally, unzip FracAtlas into data/.")
@@ -47,12 +45,12 @@ def find_data_dir(root):
 @dataclass
 class ImageSet:
     """Images in memory, with their labels and fracture boxes."""
-    images: np.ndarray   # (N, S, S) uint8, grey
-    labels: np.ndarray   # (N,) int64
-    paths: list          # file path of every image
-    sizes: np.ndarray    # (N, 2) original width and height in pixels
+    images: np.ndarray
+    labels: np.ndarray
+    paths: list          
+    sizes: np.ndarray
     class_names: list
-    boxes: list          # per image: (k, 4) fracture boxes (x0, y0, x1, y1) in pixels, k = 0 if healthy
+    boxes: list          
 
     def __len__(self):
         return len(self.labels)
@@ -76,7 +74,7 @@ def _read(path, size):
             width, height = image.size
             grey = image.convert("L").resize((size, size), Image.BILINEAR)
             return np.asarray(grey, dtype=np.uint8), (width, height)
-    except Exception:  # corrupted file: skip it (and report it)
+    except Exception: 
         return None, None
 
 
@@ -104,7 +102,7 @@ def load_dataset(data_dir, size=IMAGE_SIZE, cache_dir=None, max_per_class=None, 
             if max_per_class is not None and len(found) > max_per_class:
                 found = [found[i] for i in sorted(rng.choice(len(found), max_per_class, replace=False))]
             files += [(p, label) for p in found]
-        with ThreadPoolExecutor(workers) as pool:  # PIL releases the GIL while decoding
+        with ThreadPoolExecutor(workers) as pool:  
             loaded = list(pool.map(lambda f: _read(f[0], size), files))
         keep = [i for i, (image, _) in enumerate(loaded) if image is not None]
         if len(keep) < len(files):
@@ -138,9 +136,6 @@ def split_indices(labels, groups, val=0.15, test=0.15, seed=0):
     return {"train": np.sort(train_idx), "val": np.sort(val_idx), "test": np.sort(test_idx)}
 
 
-# ----------------------------------------------------------------------------- training data
-
-# training images only: flip, small rotation / shift / zoom (GEOMETRY, also applied to box masks), brightness
 GEOMETRY = v2.Compose([v2.RandomHorizontalFlip(), v2.RandomAffine(degrees=10, translate=(0.05, 0.05), scale=(0.9, 1.1))])
 COLOR = v2.ColorJitter(brightness=0.2, contrast=0.2)
 AUGMENT = v2.Compose([GEOMETRY, COLOR])
@@ -193,8 +188,6 @@ def pick_images(labels, n_per_class, seed=0, allowed=None):
     return np.array(picked, dtype=int)
 
 
-# ----------------------------------------------------------------------------- dataset study
-
 def summary_table(sets):
     """Images per split and class, class balance, fracture boxes and original image size."""
     rows = {}
@@ -224,9 +217,9 @@ def near_duplicates(images, threshold=0.97, size=32, device="cpu", chunk=512):
     views = _thumbnails(images, size, device)
     rows = []
     for start in range(0, views.shape[1], chunk):
-        sim = torch.einsum("vnd,md->vnm", views[:, start:start + chunk], views[0]).amax(0)  # best of the 8 views
+        sim = torch.einsum("vnd,md->vnm", views[:, start:start + chunk], views[0]).amax(0)  
         i_global = torch.arange(start, start + sim.shape[0], device=sim.device)[:, None]
-        sim = sim.masked_fill(torch.arange(sim.shape[1], device=sim.device)[None] <= i_global, -1)  # each pair once
+        sim = sim.masked_fill(torch.arange(sim.shape[1], device=sim.device)[None] <= i_global, -1)  
         i, j = torch.nonzero(sim >= threshold, as_tuple=True)
         rows.append(np.column_stack([(i + start).cpu().numpy(), j.cpu().numpy(), sim[i, j].cpu().numpy()]))
     pairs = np.concatenate(rows) if rows else np.zeros((0, 3))

@@ -29,7 +29,7 @@ def setup(root=REPO_ROOT, data_dir=None, install_deps=True):
     if install_deps:
         install()
 
-    from .data import find_data_dir  # imported after install(): data.py needs torch/torchvision
+    from .data import find_data_dir  
 
     default = Path("/kaggle/input") if env == "kaggle" else root / "data"
     data_dir = find_data_dir(data_dir or os.environ.get("BFD_DATA_DIR") or default)
