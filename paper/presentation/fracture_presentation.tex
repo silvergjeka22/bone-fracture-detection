@@ -1,12 +1,12 @@
 % Teaching a fracture classifier where to look: the presentation
 % Build:  latexmk -pdf fracture_presentation.tex      (or: pdflatex fracture_presentation.tex twice)
-% Plots come from ../../results/figures (the notebook's output); diagrams are TikZ, drawn here.
+% Plots come from ../../results/figures (the notebook's output) and figures/ (drawn for the slides from the same run);
+% diagrams are TikZ, drawn here.
 \documentclass[aspectratio=169,10pt]{beamer}
 
 % ── edit these ────────────────────────────────────────────────────────────────────────────────────
-\newcommand{\presenter}{Silver Gjeka, Sevastian Guzun}
-\newcommand{\course}{Visual Intelligence -- }
-\newcommand{\talkdate}{\today}
+\newcommand{\presenter}{Silver Gjeka (VR527645) \quad Sevastian Guzun (VR508193)}
+\newcommand{\course}{Visual Intelligence}
 
 % ── packages ──────────────────────────────────────────────────────────────────────────────────────
 \usepackage[T1]{fontenc}
@@ -17,8 +17,8 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,calc}
-\graphicspath{{../../results/figures/}}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,calc,fit,backgrounds}
+\graphicspath{{figures/}{../../results/figures/}}
 
 % ── look ──────────────────────────────────────────────────────────────────────────────────────────
 \definecolor{navy}{HTML}{1B2F5E}
@@ -27,7 +27,11 @@
 \definecolor{myorange}{HTML}{EF6C00}
 \definecolor{myblue}{HTML}{1565C0}
 \definecolor{myviolet}{HTML}{6A3FA0}
+\definecolor{mycyan}{HTML}{00A3B0}
 \definecolor{lightgray}{HTML}{EEEEEE}
+\definecolor{cA}{HTML}{8A8A8A}
+\definecolor{cB}{HTML}{4A3AA8}
+\definecolor{cC}{HTML}{E0559A}
 \setbeamertemplate{navigation symbols}{}
 \setbeamercolor{title}{fg=navy}
 \setbeamercolor{subtitle}{fg=navy}
@@ -62,6 +66,9 @@
     \vfill
   \end{frame}}
 \algrenewcommand\algorithmicrequire{\textbf{Given:}}
+% a numbered loss tag, e.g. \lnum{3}
+\newcommand{\lnum}[1]{\tikz[baseline=(n.base)]\node[circle, fill=myred, text=white, inner sep=0.9pt,
+  font=\scriptsize\bfseries] (n) {#1};}
 
 % ── TikZ styles ───────────────────────────────────────────────────────────────────────────────────
 \tikzset{
@@ -75,13 +82,14 @@
   dashbox/.style={box, fill=white, dashed},
   arr/.style={-{Stealth[length=2.4mm]}, thick},
   lab/.style={font=\scriptsize, align=center},
+  img/.style={inner sep=0pt, draw=gray!60},
 }
 
 \title{Teaching a Fracture Classifier Where to Look}
 \subtitle{CNN vs ScatNet, six XAI methods and a joint classifier--detector on FracAtlas}
 \author{\presenter}
 \institute{\small Department of Computer Science\\ Master's Degree in Artificial Intelligence\\ University of Verona}
-\date{\small \course\talkdate\\[0.8em]\scriptsize Data: FracAtlas (Abedeen et al., \emph{Scientific Data}, 2023)\\
+\date{\small \course\\[0.8em]\scriptsize Data: FracAtlas (Abedeen et al., \emph{Scientific Data}, 2023)\\
       Code: github.com/silvergjeka22/bone-fracture-detection}
 
 \begin{document}
@@ -97,17 +105,22 @@
       \begin{enumerate}
         \item The problem and the data
         \item CNN vs ScatNet (+ ResNet18)
-        \item Six XAI methods: how they work
-        \item Faithful? On the fracture?
+        \item Six XAI methods: faithful? on the fracture?
+      \end{enumerate}
+      \vspace{0.6em}
+      {\large\bfseries\color{navy} Part II -- Teach it where to look}
+      \begin{enumerate}\setcounter{enumi}{3}
+        \item Three models: A, B and C, and their losses
       \end{enumerate}
     \end{column}
     \begin{column}{0.49\textwidth}
-      {\large\bfseries\color{navy} Part II -- Teach it where to look}
+      {\large\bfseries\color{navy} Part III -- Results}
       \begin{enumerate}\setcounter{enumi}{4}
-        \item A first attempt that failed
-        \item Our joint model
-        \item YOLO proposes, our model decides
-        \item The pipeline, limits and conclusion
+        \item Do the explanations find the fracture?
+        \item Test X-rays
+        \item Every model side by side
+        \item Can our model help YOLO?
+        \item Limits and conclusion
       \end{enumerate}
     \end{column}
   \end{columns}
@@ -118,24 +131,18 @@
 \section{Classify and explain}
 
 \begin{frame}{The Problem: Right, but for the Right Reason?}
+  \vspace{1.2em}
   \begin{itemize}
     \item A model can be \textbf{accurate for the wrong reasons}: a metal plate, a cast or the body part can predict
           ``fractured'' better than a thin fracture line.
+    \vspace{0.6em}
     \item \textbf{XAI} draws a heatmap of the evidence. It helps only if it is \textbf{faithful} (shows what the model
           uses) \textbf{and} the model uses the \textbf{fracture}.
+    \vspace{0.6em}
     \item FracAtlas has the \textbf{radiologists' boxes}: we can \textbf{measure} where a model looks.
+    \vspace{0.6em}
+    \item Our question: can we \textbf{teach} a classifier to look at the fracture, without losing accuracy?
   \end{itemize}
-  \vspace{0.6em}
-  \centering
-  \resizebox{\linewidth}{!}{%
-  \begin{tikzpicture}[font=\small]
-    \node[box, text width=2.0cm] (a) at (0,0) {\textbf{Data}\\\scriptsize no leakage};
-    \node[bluebox, text width=2.2cm] (b) at (3.0,0) {\textbf{Models}\\\scriptsize CNN, ScatNet,\\ResNet18};
-    \node[violetbox, text width=2.2cm] (c) at (6.1,0) {\textbf{6 XAI methods}\\\scriptsize faithful? on the\\fracture?};
-    \node[greenbox, text width=2.3cm] (d) at (9.3,0) {\textbf{Joint model}\\\scriptsize taught where\\to look (ours)};
-    \node[orangebox, text width=2.3cm] (e) at (12.5,0) {\textbf{YOLO + pipeline}\\\scriptsize two opinions};
-    \draw[arr] (a)--(b); \draw[arr] (b)--(c); \draw[arr] (c)--(d); \draw[arr] (d)--(e);
-  \end{tikzpicture}}
 \end{frame}
 
 \begin{frame}{The Data: FracAtlas, Without Leakage}
@@ -152,17 +159,8 @@
         \item 4,083 X-rays; \textbf{717 fractured (1 in 6)}, 922 boxes.
         \item Grey, $224\times224$ (448 in our method), values in $[-1,1]$.
         \item \textbf{8.6\%} of the X-rays have a copy (158 groups): a split \textbf{keeps every group together}.
+        \item Split $\approx$70/15/15: \textbf{2,920} train, \textbf{577} val, \textbf{586} test (104 fractured).
       \end{itemize}
-      \centering\footnotesize
-      \begin{tabular}{lccc}
-        \toprule
-        & X-rays & fractured & boxes \\
-        \midrule
-        train & 2,920 & 511 & 651 \\
-        val & 577 & 102 & 136 \\
-        test & 586 & 104 & 135 \\
-        \bottomrule
-      \end{tabular}
       \vspace{0.4em}
 
       \raggedright\small Always saying ``not fractured'' already scores \textbf{82.3\%}: look at \textbf{F1} and
@@ -206,43 +204,14 @@
   fractured), 20 epochs, 5-fold grouped CV.
 \end{frame}
 
-\begin{frame}{How ScatNet Works}
+\begin{frame}{ScatNet: The Complete Architecture}
   \centering
-  \resizebox{\linewidth}{!}{%
-  \begin{tikzpicture}[font=\small]
-    \node[box] (x) at (0,0) {X-ray $x$};
-    \node[dashbox, text width=2.6cm] (w1) at (3.2,0.9) {wavelet $\psi_{j,\theta}$\\\scriptsize 4 scales $\times$ 8 angles};
-    \node[box] (m1) at (6.1,0.9) {modulus $|\cdot|$};
-    \node[dashbox] (a1) at (8.9,0.9) {average $\phi$};
-    \node[greenbox] (s1) at (11.6,0.9) {1st order};
-    \node[dashbox, text width=2.6cm] (w2) at (6.1,-0.9) {wavelet again $\psi_2$};
-    \node[box] (m2) at (8.9,-0.9) {$|\cdot|$, average};
-    \node[greenbox] (s2) at (11.6,-0.9) {2nd order};
-    \node[bluebox, text width=2.4cm] (o) at (14.2,0) {417 maps\\$14{\times}14$\\$\to$ log, BN};
-    \draw[arr] (x.east) -- ++(0.3,0) |- (w1.west);
-    \draw[arr] (w1)--(m1); \draw[arr] (m1)--(a1); \draw[arr] (a1)--(s1);
-    \draw[arr] (m1)--(w2); \draw[arr] (w2)--(m2); \draw[arr] (m2)--(s2);
-    \draw[arr] (s1.east) -| ([xshift=-4mm]o.north); \draw[arr] (s2.east) -| ([xshift=-4mm]o.south);
-  \end{tikzpicture}}
-  \vspace{0.5em}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \textbf{The idea} (Bruna \& Mallat, 2013)
-      \begin{itemize}\small
-        \item A CNN with \textbf{fixed} filters: Morlet wavelets at every scale and angle.
-        \item Modulus + averaging $\Rightarrow$ \textbf{stable to small shifts and deformations}.
-        \item 1 + 32 + 384 = \textbf{417} coefficient maps (Kymatio, $J{=}4$, $L{=}8$).
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{For fractures}
-      \begin{itemize}\small
-        \item $+$ No filters to learn: good with \textbf{little data}.
-        \item $-$ A small break \textbf{is} a small deformation: the averaging blurs exactly what we need.
-        \item $-$ Every coefficient is kept: the classifier has 41.9M parameters.
-      \end{itemize}
-    \end{column}
-  \end{columns}
+  \includegraphics[height=0.76\textheight]{arch_scatnet.png}
+  \vspace{0.1em}
+
+  \raggedright\scriptsize
+  In our run: input $224{\times}224$, $J{=}4$ scales, $L{=}8$ directions $\Rightarrow$ $C = 1+32+384 = \mathbf{417}$ maps of
+  $14{\times}14$, then log + BatchNorm, flattened into the same classifier (Bruna \& Mallat, 2013; Kymatio).
 \end{frame}
 
 \begin{frame}{CNN vs ScatNet (+ ResNet18): Results}
@@ -285,25 +254,60 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{Learning Curves and Filters}
+\begin{frame}{Learning Curves}
   \begin{columns}[T]
-    \begin{column}{0.58\textwidth}
+    \begin{column}{0.64\textwidth}
       \begin{figure}
         \includegraphics[width=\linewidth]{learning_curves.png}
-        \caption{Train (grey) and validation (colour): 5-fold CV and final training.}
+        \caption{Grey: train; colour: validation. Columns 1--2: 5-fold CV (mean $\pm$ std); columns 3--4: final
+        training (vertical line = epoch kept).}
       \end{figure}
     \end{column}
-    \begin{column}{0.4\textwidth}
-      \begin{figure}
-        \includegraphics[width=0.9\linewidth]{frequency_coverage.png}
-        \caption{First-layer filters in frequency.}
-      \end{figure}
-      \vspace{-0.5em}
-      \footnotesize
+    \begin{column}{0.34\textwidth}
+      \small
+      \textbf{CNN} (top) and \textbf{ScatNet} (middle)
       \begin{itemize}
-        \item CNN: noisy learned filters, \textbf{uneven} coverage.
-        \item ScatNet: clean wavelets, \textbf{every} scale and angle.
-        \item Clean filters are not enough: ScatNet lacks a \textbf{learned} hierarchy above them.
+        \item Train \textbf{and} val loss flatten at $\approx$0.6--0.7 after 2 epochs: \textbf{underfitting}, not
+              overfitting.
+        \item Accuracy jumps between epochs: the model flips between ``all healthy'' and guessing.
+      \end{itemize}
+      \textbf{ResNet18} (bottom)
+      \begin{itemize}
+        \item Train loss keeps falling, val loss \textbf{rises after $\approx$10 epochs}: \textbf{overfitting}.
+        \item Val accuracy still climbs slowly: we keep the \textbf{best val epoch}, not the last.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{First-Layer Filters: What Each Model Uses}
+  \begin{columns}[T]
+    \begin{column}{0.325\textwidth}
+      \centering\includegraphics[width=0.84\linewidth]{filters_cnn.png}\\[-0.1em]
+      \scriptsize\textbf{CNN}: 32 filters $7{\times}7$ learned from scratch: \textbf{noisy}, no clear edges.
+    \end{column}
+    \begin{column}{0.325\textwidth}
+      \centering\includegraphics[width=0.84\linewidth]{filters_scatnet.png}\\[-0.1em]
+      \scriptsize\textbf{ScatNet}: fixed Morlet wavelets, \textbf{every} scale and direction.
+    \end{column}
+    \begin{column}{0.325\textwidth}
+      \centering\includegraphics[width=0.84\linewidth]{filters_resnet18.png}\\[-0.1em]
+      \scriptsize\textbf{ResNet18}: ImageNet filters: clean \textbf{edges, bars and blobs}.
+    \end{column}
+  \end{columns}
+  \vspace{0.8em}
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \centering\includegraphics[width=0.74\linewidth]{frequency_coverage.png}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \small
+      \begin{itemize}
+        \item In frequency: the CNN covers the spectrum \textbf{unevenly} (2,920 X-rays are too few to learn clean
+              filters); ScatNet covers it \textbf{evenly} by construction.
+        \item But clean filters are not enough: ScatNet still fails, because it lacks a \textbf{learned} hierarchy
+              above them.
+        \item ResNet18 has both: clean filters \textbf{and} 17 learned layers above them.
       \end{itemize}
     \end{column}
   \end{columns}
@@ -330,28 +334,6 @@
   \textbf{Gradient} methods ask ``what if this pixel changed a little?''; \textbf{perturbation} methods (Occlusion, LIME)
   really \textbf{remove} parts of the X-ray (black = removed).
   Grad-CAM needs a learned convolutional layer, which ScatNet does not have.
-\end{frame}
-
-\begin{frame}{The Six Methods on the Same X-rays}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth]{xai_cnn.png}
-        \caption{CNN: 2 fractured, 2 healthy (red = for, blue = against).}
-      \end{figure}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth]{xai_scatnet.png}
-        \caption{ScatNet: Grad-CAM not applicable.}
-      \end{figure}
-    \end{column}
-  \end{columns}
-  \small
-  \begin{itemize}
-    \item The six maps are \textbf{visibly different}: there is no single ``true'' explanation.
-    \item CNN's Grad-CAM covers large areas; ScatNet's maps are spread all over the image.
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{Occlusion, Written From Scratch}
@@ -386,84 +368,77 @@
 \end{frame}
 
 \begin{frame}{Is the Map Faithful? The Deletion Test}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \small
-      Remove the \textbf{most important} $16{\times}16$ patches \textbf{first} and follow the class probability:
-      a faithful map makes it fall fast (low area). A random order is the reference.
-      \vspace{0.5em}
+  \small
+  Remove the \textbf{most important} $16{\times}16$ patches \textbf{first} and follow the class probability:
+  a faithful map makes it fall fast (\textbf{low area}). A random order is the reference.
+  \begin{figure}
+    \includegraphics[width=\linewidth]{deletion_curves.png}
+  \end{figure}
+  \vspace{-0.4em}
 
-      \centering\footnotesize
-      \begin{tabular}{lccc}
-        \toprule
-        \textbf{deletion AUC} & \textbf{CNN} & \textbf{ScatNet} & \textbf{ResNet18} \\
-        \midrule
-        Saliency & 0.530 & 0.573 & 0.663 \\
-        Integrated Grad. & 0.510 & 0.572 & 0.637 \\
-        Guided Backprop & 0.511 & \textbf{0.552} & 0.555 \\
-        Grad-CAM & \textbf{0.497} & n/a & 0.580 \\
-        Occlusion & 0.572 & 0.588 & 0.562 \\
-        LIME & 0.528 & 0.554 & \textbf{0.496} \\
-        \midrule
-        random & 0.570 & 0.576 & 0.700 \\
-        \bottomrule
-      \end{tabular}
+  \raggedright\small
+  \textbf{The winner depends on the model}: Grad-CAM for the CNN, LIME for ResNet18 (it removes patches, like the
+  test); ScatNet is close to random for every method. Saliency and IG saturate in a deep net.
+\end{frame}
+
+\begin{frame}{The Six Methods on Test X-rays (ResNet18)}
+  \begin{columns}[T]
+    \begin{column}{0.7\textwidth}
+      \includegraphics[width=\linewidth]{xai_resnet18.png}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \small
-      \textbf{The winner depends on the model}
+    \begin{column}{0.29\textwidth}
+      \footnotesize
+      Two fractured and two healthy test X-rays; each method explains the model's answer.
+      Red = evidence \textbf{for}, blue = \textbf{against}.
       \begin{itemize}
-        \item \textbf{CNN}: Grad-CAM. The last conv layer of a small CNN is where it decides.
-        \item \textbf{ScatNet}: all close to random. Its evidence is spread over hundreds of wavelet coefficients;
-              no small region matters alone.
-        \item \textbf{ResNet18}: LIME. It does what the test does: removes patches.
-        \item Saliency and IG are the least faithful on ResNet18: gradients are local and saturate in a deep net.
+        \item \textbf{Saliency, IG}: scattered pixels, noisy.
+        \item \textbf{Guided Backprop}: sharp, but traces every bone edge.
+        \item \textbf{Grad-CAM}: one large blob (7$\times$7 grid).
+        \item \textbf{Occlusion, LIME}: patches, the most faithful in the deletion test.
       \end{itemize}
+      The six maps disagree: there is no single ``true'' explanation.
     \end{column}
   \end{columns}
 \end{frame}
 
 \begin{frame}{Does the Map Point at the Fracture?}
   \centering
-  \resizebox{\linewidth}{!}{%
-  \begin{tikzpicture}[font=\small]
-    \node[violetbox] (m) at (0,0) {XAI map};
-    \node[box, text width=2.4cm] (a) at (3.1,0) {positive part,\\Gaussian $\sigma{=}4$};
-    \node[box, text width=2.3cm] (b) at (6.2,0) {pixels $\ge$ 50\%\\of the maximum};
-    \node[box, text width=2.3cm] (c) at (9.3,0) {blob with the\\most evidence};
-    \node[greenbox] (d) at (12.0,0) {our box};
-    \node[box] (p) at (6.2,-1.35) {hottest point};
-    \node[redbox] (h) at (10.0,-1.35) {inside the radiologist's box? $\Rightarrow$ \textbf{hit}};
-    \draw[arr] (m)--(a); \draw[arr] (a)--(b); \draw[arr] (b)--(c); \draw[arr] (c)--(d);
-    \draw[arr] (a.south) |- (p.west); \draw[arr] (p)--(h);
+  \resizebox{0.86\linewidth}{!}{%
+  \begin{tikzpicture}[font=\small, node distance=4mm]
+    \node[violetbox] (m) {XAI map};
+    \node[box, right=of m] (a) {positive part, smoothed};
+    \node[box, right=of a] (p) {hottest point};
+    \node[redbox, right=of p] (h) {inside the radiologist's box? $\Rightarrow$ \textbf{hit}};
+    \draw[arr] (m)--(a); \draw[arr] (a)--(p); \draw[arr] (p)--(h);
   \end{tikzpicture}}
   \vspace{0.4em}
+
+  \includegraphics[width=0.8\linewidth]{hits_part1.png}
+  \vspace{0.2em}
+
+  \raggedright\small
+  \textbf{Rarely.} 104 fractured test X-rays; a random point hits 1\%. The best is Integrated Gradients on ResNet18:
+  \textbf{23\%}. CNN and ScatNet stay at 0--4\% with every method.
+\end{frame}
+
+\begin{frame}{Why So Rarely? ResNet18's Six Maps}
   \begin{columns}[T]
-    \begin{column}{0.42\textwidth}
-      \centering\scriptsize\setlength{\tabcolsep}{3pt}
-      \begin{tabular}{lccc}
-        \toprule
-        \textbf{hit rate (\%)} & CNN & ScatNet & ResNet18 \\
-        \midrule
-        Saliency & 3.8 & 0.0 & 3.8 \\
-        Integrated Grad. & 2.9 & 2.9 & \textbf{23.1} \\
-        Guided Backprop & 3.8 & 0.0 & 4.8 \\
-        Grad-CAM & 0.0 & n/a & 9.6 \\
-        Occlusion & 3.8 & 3.8 & 6.7 \\
-        LIME & 0.0 & 0.0 & 1.0 \\
-        \bottomrule
-      \end{tabular}
-      \\[0.2em]\scriptsize 104 fractured test X-rays; random point: 1\%.
+    \begin{column}{0.64\textwidth}
+      \begin{figure}
+        \includegraphics[width=\linewidth]{boxes_resnet18.png}
+        \caption{Three fractured test X-rays. Dashed: the radiologist's box; yellow: the box we cut from each map.}
+      \end{figure}
     \end{column}
-    \begin{column}{0.54\textwidth}
+    \begin{column}{0.34\textwidth}
       \small
-      \textbf{Rarely.} Best: Integrated Gradients on ResNet18, \textbf{23\%}. Why so low?
       \begin{itemize}
         \item The boxes are \textbf{tiny} (1\% of the image); fractures are 1--2 px at 224 px.
         \item A third of the fractures are \textbf{missed} by the model.
-        \item The model also uses \textbf{shortcuts} (plates, casts), and the faithful maps honestly show them.
+        \item The model uses \textbf{shortcuts}: the chest, the elbow, the hand; the faithful maps honestly show them.
+        \item Grad-CAM on the $7{\times}7$ layer4 grid: one cell = 32 px, too coarse for a 1-px line.
       \end{itemize}
-      $\Rightarrow$ Faithful maps are not enough: the \textbf{model} must look at the fracture.
+      \vspace{0.3em}
+      $\Rightarrow$ Faithful maps are not enough: the \textbf{model} must be taught to look at the fracture.
     \end{column}
   \end{columns}
 \end{frame}
@@ -472,360 +447,240 @@
 \partslide{II}{Teach the Model Where to Look}{One network that classifies, detects, and is trained on its own explanation}
 \section{Our method}
 
-\begin{frame}{A First Attempt That Failed}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \centering
-      \begin{tikzpicture}[font=\small]
-        \node[bluebox, text width=3.0cm] (r) at (0,0) {ResNet18, 224 px};
-        \node[box, text width=2.2cm] (l3) at (-2.0,-1.5) {layer3\\$14{\times}14$};
-        \node[box, text width=2.2cm] (l4) at (2.0,-1.5) {layer4\\$7{\times}7$};
-        \node[redbox, text width=2.2cm] (e) at (-2.0,-3.2) {Energy loss:\\Grad-CAM in box};
-        \node[redbox, text width=2.2cm] (s) at (-2.0,-4.8) {contrastive loss:\\box vs background};
-        \node[violetbox, text width=2.2cm] (g) at (2.0,-3.2) {Grad-CAM\\\textbf{scored} here};
-        \draw[arr] (r) -- (l3); \draw[arr] (r) -- (l4); \draw[arr] (l3)--(e); \draw[arr] (l4)--(g);
-        \draw[arr] (l3.west) -- ++(-0.3,0) |- (s.west);
-        \draw[myred, very thick] (e.east) -- node[lab, text=myred, above]{different} node[lab, text=myred, below]{layers!} (g.west);
-      \end{tikzpicture}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \small
-      \textbf{Result}: Grad-CAM hit rate 10.6\% $\to$ 10.6\%, and \textbf{5.8\%} with the contrastive loss.
-      \vspace{0.4em}
+\begin{frame}{Model A: Classifier Only (Baseline)}
+  \small
+  \textbf{Three models, one network}: the same ResNet18 at \textbf{448 px}, same data, 20 epochs and seed.
+  \textbf{Only the training loss changes} from A to B to C.
+  \vspace{0.3em}
 
-      \textbf{Three reasons, three lessons}
-      \begin{enumerate}
-        \item Trained on layer3, \textbf{scored on layer4} $\Rightarrow$ score the layer you train.
-        \item Grad-CAM's ReLU let the map \textbf{collapse to zero}: no gradient left $\Rightarrow$ use a smooth target
-              (softmax).
-        \item The contrastive loss hit its \textbf{lowest value at once}: a box on bone vs black background is trivially
-              different $\Rightarrow$ compare things that are hard to tell apart.
-      \end{enumerate}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Our Joint Model}
   \centering
-  \resizebox{\linewidth}{!}{%
-  \begin{tikzpicture}[font=\small]
-    \node[box, minimum width=2.2cm] (x) at (0,0.6) {X-ray, 448 px};
-    \node[dashbox, minimum width=2.2cm] (xm) at (0,-0.9) {mirrored X-ray};
-    \node[bluebox, text width=2.3cm] (bb) at (3.3,0) {ResNet18\\layers 1--3};
-    \node[box, text width=2.0cm] (g) at (6.3,0) {layer3 grid\\$28{\times}28$};
-    \node[bluebox, text width=2.2cm] (l4) at (9.3,1.7) {layer4, pooling};
-    \node[greenbox, text width=2.2cm] (cl) at (12.3,1.7) {same\\classifier};
-    \node[violetbox, text width=2.2cm] (gc) at (9.3,0) {Grad-CAM\\\scriptsize fractured $-$ healthy};
-    \node[violetbox, text width=2.2cm] (sm) at (12.3,0) {softmax over\\784 cells};
-    \node[greenbox, text width=2.2cm] (dh) at (9.3,-1.7) {detector head\\\scriptsize CenterNet};
-    \node[greenbox, text width=2.2cm] (cm) at (12.3,-1.7) {centre map\\+ box size};
-    \node[redbox, text width=2.2cm] (lce) at (15.7,1.9) {\textbf{CE} (label)};
-    \node[redbox, text width=2.2cm] (lp) at (15.7,0.7) {\textbf{point}};
-    \node[redbox, text width=2.2cm] (la) at (15.7,-0.5) {\textbf{agree}};
-    \node[redbox, text width=2.2cm] (ld) at (15.7,-1.7) {\textbf{detect}};
-    \node[box, fill=white, text width=3.0cm] (bl) at (6.3,-3.1) {blur the fracture / a\\random patch};
-    \node[redbox, text width=2.2cm] (le) at (15.7,-3.1) {\textbf{erase}};
-    \draw[arr] (x.east) -- ++(0.3,0) |- ([yshift=1.5mm]bb.west);
-    \draw[arr, dashed] (xm.east) -- ++(0.3,0) |- ([yshift=-1.5mm]bb.west);
-    \draw[arr] (bb)--(g);
-    \draw[arr] (g.east) -- ++(0.35,0) |- (l4.west); \draw[arr] (g)--(gc); \draw[arr] (g.east) -- ++(0.35,0) |- (dh.west);
-    \draw[arr] (l4)--(cl); \draw[arr] (gc)--(sm); \draw[arr] (dh)--(cm);
-    \draw[arr] (cl.east) -- (lce.west|-cl); \draw[arr] (sm.east) -- ++(0.5,0) |- (lp.west); \draw[arr] (sm.east) -- ++(0.5,0) |- (la.west);
-    \draw[arr] (cm.east) -- ++(0.9,0) |- ([yshift=-1mm]la.west); \draw[arr] (cm.east) -- ++(0.9,0) |- (ld.west);
-    \draw[arr] (x.west) -- ++(-0.3,0) |- (bl.west); \draw[arr] (bl)--(le);
-    \draw[arr, myviolet, dotted] (cl.south west) -- node[lab, text=myviolet, right, pos=0.4]{gradient} (gc.north east);
-  \end{tikzpicture}}
+  \includegraphics[width=\linewidth]{arch_model_a.png}
   \vspace{0.2em}
-  \begin{columns}[T]
-    \begin{column}{0.49\textwidth}
-      \small
-      \begin{itemize}
-        \item \textbf{448 px}: four times the pixels, thin fractures survive.
-        \item One \textbf{shared grid} of 16-px cells feeds three heads: classifier, detector, Grad-CAM.
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \small
-      \begin{itemize}
-        \item Grad-CAM is computed \textbf{during training}, on the layer that is scored.
-        \item \textbf{A}: CE only.\quad \textbf{B}: + detect.\quad \textbf{C}: all five (ours).
-      \end{itemize}
-    \end{column}
-  \end{columns}
-\end{frame}
 
-\begin{frame}{The Five Losses: What Each Does and Why}
-  \centering\footnotesize
-  \renewcommand{\arraystretch}{1.3}\setlength{\tabcolsep}{4pt}
-  \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{1.4cm}>{\raggedright\arraybackslash}p{5.6cm}>{\raggedright\arraybackslash}p{6.1cm}}
-    \toprule
-    & \textbf{what it asks} & \textbf{why it should help} \\
-    \midrule
-    CE & the right label (batches half fractured) & the classification task \\
-    detect & CenterNet: a peak at the fracture centre + the box size & multi-task: the shared grid must learn \textbf{where} fractures are \\
-    point & $-\log\sum_{i\in\text{box}}p_i$, \ $p=$ softmax of Grad-CAM & a smooth version of the hit rate; the softmax never loses its gradient \\
-    agree & $\mathrm{JS}(p,q_{\text{detector}})+\mathrm{JS}(p,\mathrm{flip}(p_{\text{mirror}}))$ & SimCLR-like: two views must point at the same place; updates \textbf{both} heads \\
-    erase & blurred fracture $\Rightarrow$ ``healthy''; blurred random patch $\Rightarrow$ still ``fractured'' & a map can move without the reasoning; the \textbf{decision} must follow the fracture \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.6em}
-  \[
-    \mathcal{L}=\mathrm{CE}+\lambda_d\,\mathcal{L}_{\text{det}}+r(t)\big[\lambda_p\mathcal{L}_{\text{point}}
-    +\lambda_a\mathcal{L}_{\text{agree}}+\lambda_e\mathcal{L}_{\text{erase}}\big],\qquad
-    \lambda_d{=}1,\ \lambda_{p,a,e}{=}0.5
-  \]
-  \small The explanation losses start after a 2-epoch warm-up $r(t)$. Same data, budget and seed for A, B and C.
-\end{frame}
-
-\begin{frame}{A vs B vs C: Accuracy}
+  \raggedright
   \begin{columns}[T]
-    \begin{column}{0.55\textwidth}
-      \centering\footnotesize
-      \begin{tabular}{lccccc}
-        \toprule
-        & \textbf{accuracy} & \textbf{F1} & \textbf{found} & \textbf{false al.} & \textbf{AUC} \\
-        \midrule
-        ResNet18, 224 & 91.5 & 73.7 & 67\% & 16 & 91.2 \\
-        A: separate & 93.3 & 81.0 & 80\% & 18 & 94.4 \\
-        B: + detector & \textbf{94.2} & \textbf{82.3} & 76\% & \textbf{9} & 94.3 \\
-        C: + XAI losses & 93.0 & 80.4 & \textbf{81\%} & 21 & \textbf{95.2} \\
-        \bottomrule
-      \end{tabular}
-      \\[0.3em]\scriptsize 586 test X-rays; threshold chosen on val F1.
-      \begin{figure}
-        \includegraphics[width=0.92\linewidth]{final_scoreboard.png}
-      \end{figure}
-    \end{column}
-    \begin{column}{0.43\textwidth}
+    \begin{column}{0.48\textwidth}
       \small
+      \textbf{Loss}: cross-entropy only, $\mathcal{L}_A=\mathcal{L}_{\text{CE}}$, batches of 16, half fractured.
       \begin{itemize}
-        \item \textbf{448 px} already helps: A finds 80\% of the fractures vs 67\%.
-        \item A, B and C are \textbf{within each other's confidence intervals} (about $\pm2$ points).
-        \item A second full run gave 91.1, 93.3, 93.9\%: one-point gaps are noise.
+        \item 448 px: 4$\times$ the pixels, thin fractures survive.
+        \item Boxes come from a \textbf{separate} YOLO.
       \end{itemize}
-      \vspace{0.3em}
-      \colorbox{myblue!10}{\parbox{0.92\linewidth}{\small Our method does not change \textbf{how often} the model is
-      right. It changes \textbf{why}: next slides.}}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{A vs B vs C: Where Do the Explanations Point?}
-  \begin{columns}[T]
-    \begin{column}{0.55\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth]{joint_localization.png}
-        \caption{Hit rate of the six methods, 104 fractured test X-rays.}
-      \end{figure}
-    \end{column}
-    \begin{column}{0.43\textwidth}
-      \centering\footnotesize
-      \begin{tabular}{lccc}
-        \toprule
-        & A & C & $p$ (A vs C) \\
-        \midrule
-        Grad-CAM & 35 & \textbf{67} & $<$0.001 \\
-        Guided Backprop & 33 & \textbf{52} & 0.0001 \\
-        Occlusion & 32 & 43 & 0.050 \\
-        Integrated Grad. & 54 & 62 & 0.077 \\
-        Saliency & 40 & 49 & 0.136 \\
-        LIME & 16 & 24 & 0.115 \\
-        \bottomrule
-      \end{tabular}
-      \vspace{0.3em}
-      \small
-      \begin{itemize}
-        \item \textbf{B}: the detector alone lifts every method (mean 35 $\to$ 48\%).
-        \item \textbf{C}: Grad-CAM \textbf{doubles} (36 $\to$ 70 of 104 X-rays).
-        \item Only Grad-CAM is in the loss, yet every method improves.
-      \end{itemize}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Is It Real? Blur the Fracture}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth]{erase_test.png}
-        \caption{Mean $p(\text{fractured})$ of the fractured test X-rays.}
-      \end{figure}
-      \centering\footnotesize
-      \begin{tabular}{lccc}
-        \toprule
-        & as they are & fracture blurred & random patch \\
-        \midrule
-        A & 80.6 & 84.4 & 80.9 \\
-        B & 77.0 & 47.7 & 77.7 \\
-        C & 83.7 & \textbf{2.5} & 79.4 \\
-        \bottomrule
-      \end{tabular}
-    \end{column}
-    \begin{column}{0.46\textwidth}
-      \small
-      \begin{itemize}
-        \item \textbf{A ignores the fracture}: blur it and its answer does not change.
-        \item \textbf{C decides from the fracture}: blur it and $p$ falls to 2.5\%; blur an equal patch elsewhere and it
-              stays at 79\%.
-        \item So the better maps are \textbf{not cosmetic}: the decision moved with them.
-        \item Faithfulness is kept: mean deletion AUC 0.55 (A), 0.52 (B), 0.54 (C).
-      \end{itemize}
-      \vspace{0.2em}
-      \footnotesize C is trained with this blur on other X-rays; the random-patch control and the five methods outside
-      its loss are the independent evidence. Same picture in a second full run (blur drop 81 points).
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Random Test X-rays (Not Picked by Hand)}
-  \begin{columns}[T]
-    \begin{column}{0.4\textwidth}
-      \begin{figure}
-        \includegraphics[height=0.82\textheight]{test_gallery.png}
-      \end{figure}
-    \end{column}
-    \begin{column}{0.58\textwidth}
-      \small
-      \begin{itemize}
-        \item Six fractured test X-rays drawn at random.
-        \item Columns 1--2: where \textbf{A} and \textbf{C} look (red); dashed: the radiologist's box.
-        \item C's evidence is \textbf{tighter} and sits on the bone near the break; A's spreads over the hand, joints
-              and edges.
-        \item Columns 3--4: YOLO's box, and the box C chooses among YOLO's boxes (next slides).
-      \end{itemize}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Can Our Model Help YOLO? YOLO Proposes, C Decides}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \centering
-      \begin{tikzpicture}[font=\small]
-        \node[box] (x) at (0,0) {test X-ray};
-        \node[orangebox, text width=2.6cm] (y) at (-1.7,-1.5) {YOLO: 10 best\\boxes, conf.\ $c$};
-        \node[bluebox, text width=2.6cm] (m) at (1.9,-1.5) {model C: $p$,\\Grad-CAM};
-        \node[violetbox, text width=4.6cm] (s) at (0,-3.2) {score each box:\\$p\cdot c^{\,1-\alpha}\cdot h^{\alpha}$\\\scriptsize $h$ = Grad-CAM inside the box};
-        \node[box, fill=white, text width=2.3cm] (d1) at (-1.7,-5.0) {$p<t$:\\no box (healthy)};
-        \node[greenbox, text width=2.3cm] (d2) at (1.9,-5.0) {best-scored\\box};
-        \draw[arr] (x.south) -- ++(0,-0.3) -| (y.north); \draw[arr] (x.south) -- ++(0,-0.3) -| (m.north);
-        \draw[arr] (y.south) -- ++(0,-0.3) -| ([xshift=-6mm]s.north); \draw[arr] (m.south) -- ++(0,-0.3) -| ([xshift=6mm]s.north);
-        \draw[arr] (s.south) -- ++(0,-0.3) -| (d1.north); \draw[arr] (s.south) -- ++(0,-0.3) -| (d2.north);
-      \end{tikzpicture}
     \end{column}
     \begin{column}{0.48\textwidth}
       \small
-      \textbf{YOLOv8s} (COCO-pretrained, 640 px): mAP@0.5 = \textbf{54.4\%} (FracAtlas paper: 56.2\%); its best box is
-      on the fracture for \textbf{79\%} of the X-rays: better than any explanation (67\%).
-      \vspace{0.4em}
-
-      \textbf{Idea}: YOLO is good at drawing boxes, C at knowing \emph{whether} and \emph{where}.
+      \textbf{Why it falls short}: nothing in its loss says \textbf{where}.
       \begin{itemize}
-        \item $\alpha$ chosen on val: $0.5$ (74.5\% vs 71.6\% for YOLO's order).
-        \item $\alpha=0$ is YOLO's own order.
-        \item Option: drop the boxes of X-rays C calls healthy.
+        \item Grad-CAM on the fracture: \textbf{35\%}.
+        \item Blur the fracture: $p(\text{fractured})$ 81\% $\to$ \textbf{84\%}: it does not need the fracture.
       \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
 
-\begin{frame}{YOLO vs YOLO + C}
+\begin{frame}{Model B: Classifier + Detector}
   \begin{columns}[T]
-    \begin{column}{0.55\textwidth}
-      \begin{figure}
-        \includegraphics[width=\linewidth]{fusion_scores.png}
-      \end{figure}
-      \centering\footnotesize
-      \begin{tabular}{lcccc}
-        \toprule
-        & hit & $p$ & AP frac. & AP all \\
-        \midrule
-        YOLO alone & \textbf{78.8} & -- & \textbf{53.0} & 40.7 \\
-        YOLO + C, re-ranked & 76.0 & 0.38 & 49.7 & \textbf{46.9} \\
-        \ + healthy dropped & 64.4 & $<$0.001 & 46.6 & 44.6 \\
-        \bottomrule
-      \end{tabular}
+    \begin{column}{0.75\textwidth}
+      \includegraphics[width=\linewidth]{arch_model_b.png}
     \end{column}
-    \begin{column}{0.43\textwidth}
-      \small
-      \textbf{Placing the box: no.} 76\% vs 79\%, not significant. YOLO's ranking is already good, and C's Grad-CAM
-      (16-px cells) is coarser than YOLO's boxes.
-      \vspace{0.4em}
-
-      \textbf{Fewer false boxes: yes.} On all X-rays, AP@0.5 rises from 40.7 to \textbf{46.9}: multiplying by
-      $p(\text{fractured})$ pushes YOLO's boxes on healthy X-rays to the bottom.
-      \vspace{0.4em}
-
-      \textbf{Dropping boxes} is worse: C misses about 1 fracture in 5.
-      \vspace{0.4em}
-
-      $\Rightarrow$ For \emph{where}, use YOLO; for \emph{whether}, use C.
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{The Pipeline: Two Opinions}
-  \begin{columns}[T]
-    \begin{column}{0.47\textwidth}
-      \centering
-      \begin{tikzpicture}[font=\small, scale=0.82, every node/.style={transform shape}]
-        \node[box] (x) at (0,0) {test X-ray};
-        \node[bluebox, text width=2.4cm] (c) at (-1.6,-1.5) {model C:\\fractured?};
-        \node[orangebox, text width=2.4cm] (y) at (1.6,-1.5) {YOLO: a box\\with $c\ge0.25$?};
-        \node[box, text width=2.6cm] (q) at (0,-3.0) {do they agree?};
-        \node[greenbox, text width=2.4cm] (d) at (-1.6,-4.5) {\textbf{decide}\\\scriptsize + C's chosen box};
-        \node[redbox, text width=2.4cm] (r) at (1.6,-4.5) {\textbf{review} by a\\radiologist};
-        \draw[arr] (x.south) -- ++(0,-0.3) -| (c.north); \draw[arr] (x.south) -- ++(0,-0.3) -| (y.north);
-        \draw[arr] (c.south) |- (q.west); \draw[arr] (y.south) |- (q.east);
-        \draw[arr] (q.south) -- ++(0,-0.3) -| node[lab, pos=0.25, above]{yes} (d.north);
-        \draw[arr] (q.south) -- ++(0,-0.3) -| node[lab, pos=0.25, above]{no} (r.north);
-      \end{tikzpicture}
+    \begin{column}{0.24\textwidth}
+      \footnotesize
+      \textbf{How}: a small \textbf{detector head} (CenterNet, Zhou et al.\ 2019) on the \textbf{same} layer3 grid as
+      the classifier.
       \vspace{0.3em}
 
-      \footnotesize
-      \begin{tabular}{lc}
-        \toprule
-        decided & 76\% of the X-rays \\
-        right when it decides & \textbf{96.6\%} \\
-        sent to review & 24\% \\
-        fractures missed & \textbf{5.8\%} (6 of 104) \\
-        \bottomrule
-      \end{tabular}
-    \end{column}
-    \begin{column}{0.51\textwidth}
-      \begin{figure}
-        \includegraphics[width=0.78\linewidth]{mistakes.png}
-        \caption{C's surest mistakes. Top: missed fractures; bottom: false alarms.}
-      \end{figure}
-      \vspace{-0.6em}
-      \footnotesize On 2 of C's 3 surest \textbf{missed} fractures YOLO's box is \textbf{on} the fracture: the
-      pipeline asks for a review instead of missing them.
+      \textbf{Detection loss}: focal loss on the centre heatmap + L1 on offset and size, from the radiologists' boxes.
+      \vspace{0.3em}
+
+      \textbf{Why it helps}: the shared grid must learn \textbf{where} fractures are: Grad-CAM 35\% $\to$
+      \textbf{56\%}.
+      \vspace{0.3em}
+
+      \textbf{Why not enough}: the classifier is still free to decide from elsewhere; nothing ties \emph{its}
+      explanation to the box.
     \end{column}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Every Method Side by Side}
+\begin{frame}{Model C: Our Joint Model (B + Explanation Losses)}
+  \centering
+  \includegraphics[width=0.84\linewidth]{arch_model_c.png}
+  \vspace{0.1em}
+
+  \raggedright
+  \begin{columns}[T]
+    \begin{column}{0.33\textwidth}
+      \scriptsize
+      \textbf{Point}: Grad-CAM (on the same 28$\times$28 grid), softmax $\to$ $p$; maximise the mass inside the box.
+      A smooth hit rate; the softmax never loses its gradient.
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \scriptsize
+      \textbf{Agree}: Grad-CAM $\leftrightarrow$ detector map, X-ray $\leftrightarrow$ mirrored X-ray (Jensen--Shannon).
+      SimCLR-like: two views, one place; it updates \textbf{both} heads.
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \scriptsize
+      \textbf{Erase}: blur the fracture $\Rightarrow$ ``healthy''; blur a random patch $\Rightarrow$ still ``fractured''.
+      Moves the \textbf{decision}, not only the map.
+    \end{column}
+  \end{columns}
+  \vspace{0.2em}
+  \scriptsize Grad-CAM, not IG, in the loss: one backward pass per step. Explanation losses start after a 2-epoch warm-up.
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════════════════════════════════════
+\partslide{III}{Results}{A vs B vs C, test X-rays, and YOLO}
+\section{A vs B vs C}
+
+\begin{frame}{A vs B vs C: Where They Look, and Why}
+  \begin{columns}[T]
+    \begin{column}{0.335\textwidth}
+      \centering\textbf{\small 1. On the fracture?}\\[0.2em]
+      \includegraphics[width=\linewidth]{hits_abc.png}\\[0.2em]
+      \raggedright\scriptsize Hit rate, 104 fractured test X-rays.
+      \begin{itemize}
+        \item \textbf{B} lifts every method (mean 35 $\to$ 48\%).
+        \item \textbf{C}: Grad-CAM \textbf{35 $\to$ 67\%} ($p<0.001$), the best method.
+        \item Only Grad-CAM is in C's loss, yet the others improve too.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.335\textwidth}
+      \centering\textbf{\small 2. Still faithful?}\\[0.2em]
+      \includegraphics[width=\linewidth]{deletion_abc.png}\\[0.2em]
+      \raggedright\scriptsize Deletion AUC, lower = more faithful.
+      \begin{itemize}
+        \item Mean of six: 0.55 (A), 0.52 (B), 0.54 (C); random $\approx$0.70.
+        \item \textbf{Faithfulness is kept}; LIME stays the most faithful.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \centering\textbf{\small 3. Does the decision follow?}\\[0.2em]
+      \includegraphics[width=\linewidth]{erase_test.png}\\[0.2em]
+      \raggedright\scriptsize $p(\text{fractured})$: as is / fracture blurred / random patch blurred.
+      \begin{itemize}
+        \item \textbf{A}: 81 / 84 / 81: it ignores the fracture.
+        \item \textbf{C}: 84 / \textbf{2.5} / 79: it decides \textbf{from} the fracture.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \centering
+  \colorbox{myblue!10}{\parbox{0.97\linewidth}{\small\centering The better maps are \textbf{not cosmetic}: C looks at the
+  fracture, stays faithful, and its answer changes when the fracture is removed.}}
+\end{frame}
+
+\begin{frame}{Test}
+  \begin{columns}[T]
+    \begin{column}{0.68\textwidth}
+      \includegraphics[width=\linewidth]{test_abc_won.png}
+    \end{column}
+    \begin{column}{0.31\textwidth}
+      \footnotesize
+      Grad-CAM of A, B, C on five \textbf{new} fractured test X-rays.
+      \begin{itemize}
+        \item Red: where the model looks; \textbf{X}: its hottest point; dashed: the radiologist's box.
+        \item \textbf{A} looks at a label, the hand, the foot, an image corner.
+        \item \textbf{B} already finds 4 of 5; \textbf{C} finds all 5.
+        \item C is one of \textbf{35} such X-rays; the opposite (A hits, C misses) happens \textbf{once}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Test: One X-ray, Six Methods, Three Models}
+  \centering
+  \includegraphics[height=0.7\textheight]{test_six_1.png}
+  \vspace{0.2em}
+
+  \raggedright\footnotesize
+  \textbf{A thin lower-leg fracture.} \textbf{A}: all six methods miss. \textbf{B}: IG and Saliency find it.
+  \textbf{C}: four of six, including gradient methods outside its loss. Occlusion and LIME (32-px patches) stay too
+  coarse for a 1-cell box.
+\end{frame}
+
+\begin{frame}{Every Model Side by Side}
   \centering
   \footnotesize
   \renewcommand{\arraystretch}{1.15}\setlength{\tabcolsep}{4pt}
-  \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{2.2cm}>{\raggedright\arraybackslash}p{4.0cm}ccc>{\raggedright\arraybackslash}p{3.3cm}}
+  \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{2.4cm}>{\raggedright\arraybackslash}p{3.8cm}cccc>{\raggedright\arraybackslash}p{3.0cm}}
     \toprule
-    & \textbf{what it learns} & \textbf{acc.} & \textbf{F1} & \textbf{best hit} & \textbf{good at} \\
+    & \textbf{what it learns} & \textbf{acc.} & \textbf{F1} & \textbf{best hit} & \textbf{blur drop} & \textbf{good at} \\
     \midrule
-    CNN & filters from 2,920 X-rays & 80.9 & 23.3 & 4\% & -- (underfits) \\
-    ScatNet & only the classifier & 80.0 & 31.6 & 4\% & stable features, no fractures \\
-    ResNet18 & fine-tunes ImageNet & 91.5 & 73.7 & 23\% & classification \\
-    A: 448 px & same, 4$\times$ the pixels & 93.3 & 81.0 & 54\% & finding fractures \\
-    B: + detector & + where the centre is & \textbf{94.2} & \textbf{82.3} & 60\% & fewest false alarms \\
-    \textbf{C: ours} & + where it looks, blur test & 93.0 & 80.4 & \textbf{67\%} & \textbf{looking at the fracture} \\
-    YOLOv8 & only boxes & -- & -- & \textbf{79\%} (box) & \textbf{placing the box} \\
+    CNN & filters from 2,920 X-rays & 80.9 & 23.3 & 4\% & -- & -- (underfits) \\
+    ScatNet & only the classifier & 80.0 & 31.6 & 4\% & -- & stable features, no fractures \\
+    ResNet18 & fine-tunes ImageNet & 91.5 & 73.7 & 23\% & -- & classification \\
+    A: classifier only & same, 4$\times$ the pixels & 93.3 & 81.0 & 54\% & $-4$ & finding fractures \\
+    B: + detector & + where the centre is & \textbf{94.2} & \textbf{82.3} & 60\% & 29 & fewest false alarms \\
+    \textbf{C: ours} & + where it looks, blur test & 93.0 & 80.4 & \textbf{67\%} & \textbf{81} & \textbf{looking at the fracture} \\
+    YOLOv8 & only boxes & -- & -- & \textbf{79\%} (box) & -- & \textbf{placing the box} \\
     \bottomrule
   \end{tabular}
   \vspace{0.6em}
 
   \raggedright\small
-  ``best hit'': best of the six maps (for YOLO: its most confident box). Same 586 test X-rays for all; A, B, C and
-  YOLO at 448--640 px, the others at 224 px.
+  ``best hit'': best of the six maps (for YOLO: its most confident box). ``blur drop'': points of $p(\text{fractured})$
+  lost when the fracture is blurred. Same 586 test X-rays for all.
+  \vspace{0.4em}
+
+  \colorbox{myblue!10}{\parbox{0.97\linewidth}{\small A, B and C are within each other's confidence intervals ($\pm$2
+  points; a second run gave 91.1 / 93.3 / 93.9\%). Our method does not change \textbf{how often} the model is right.
+  It changes \textbf{why}.}}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════════════════════════════════════
+
+\begin{frame}{YOLO + C: YOLO Proposes, C Decides}
+  \centering
+  \includegraphics[width=\linewidth]{arch_yolo_c.png}
+  \vspace{0.1em}
+
+  \raggedright
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{YOLOv8s} (COCO-pretrained, fine-tuned on the boxes): its best box is on the fracture for
+              \textbf{79\%} of the X-rays, better than any explanation (67\%).
+        \item Each of YOLO's 10 boxes is re-scored with C:
+              $p\cdot c^{\,1-\alpha}\cdot h^{\alpha}$, $\alpha=0.5$ chosen on val.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \begin{itemize}
+        \item C and YOLO \textbf{agree} $\Rightarrow$ decide (76\% of the X-rays, \textbf{96.6\%} right);
+              they disagree $\Rightarrow$ radiologist review (24\%).
+        \item Fractures missed: \textbf{5.8\%} (6 of 104).
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Test: YOLO vs YOLO + C}
+  \begin{columns}[T]
+    \begin{column}{0.42\textwidth}
+      \centering
+      \includegraphics[height=0.8\textheight]{yolo_vs_c_test.png}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \small
+      \textbf{Top}: YOLO's best box is off the fracture; C's Grad-CAM lifts the right one: miss $\to$ \textbf{hit}.\\
+      \textbf{Bottom}: both miss: C can only choose among YOLO's boxes.
+      \vspace{0.5em}
+
+      \textbf{Recap on all test X-rays}
+      \begin{itemize}
+        \item \textbf{Placing the box}: no gain: 76\% vs 79\% (not significant). YOLO's own ranking is already good.
+        \item \textbf{Fewer false boxes}: yes: AP@0.5 on all X-rays \textbf{40.7 $\to$ 46.9}, boxes on healthy
+              X-rays fall to the bottom.
+        \item \textbf{Pipeline}: when C and YOLO agree it decides 76\% of the X-rays, \textbf{96.6\%} right; the rest
+              goes to a radiologist.
+      \end{itemize}
+      \vspace{0.3em}
+      $\Rightarrow$ For \emph{where}, use YOLO; for \emph{whether}, use C.
+    \end{column}
+  \end{columns}
 \end{frame}
 
 \section{Conclusion}
@@ -840,6 +695,7 @@
         \item Loss weights, thresholds, $\alpha$ set once, not tuned.
         \item The pointing game is strict: one point, a tiny box.
         \item C is trained with the blur it is tested with (controls: random patch, five untrained maps).
+        \item Casts and metal plates still fool every model.
         \item The built-in detector stays far behind YOLO (AP 22--31\% vs 53\%).
       \end{itemize}
     \end{column}
@@ -862,10 +718,10 @@
           \textbf{91.5\%}.
     \item \textbf{Six XAI methods}: the most faithful depends on the model (Grad-CAM for the CNN, LIME for ResNet18);
           our Occlusion equals Captum; but the maps point at the fracture at most \textbf{23\%} of the time.
-    \item \textbf{Our joint model} (classifier + detector + explanation losses, 448 px):
+    \item \textbf{Our joint model C} (classifier + detector + explanation losses, 448 px):
       \begin{itemize}
         \item keeps the accuracy (\textbf{93.0\%});
-        \item Grad-CAM hits the fracture \textbf{67\%} of the time instead of 35\%;
+        \item Grad-CAM hits the fracture \textbf{67\%} of the time instead of 35\%, and the five other methods improve too;
         \item blurring the fracture now changes the answer (84\% $\to$ \textbf{3\%}).
       \end{itemize}
     \item \textbf{YOLO} remains the best box finder (79\%); our model helps it by removing false boxes (AP on all X-rays
