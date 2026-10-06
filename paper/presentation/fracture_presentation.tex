@@ -401,6 +401,25 @@
   \end{columns}
 \end{frame}
 
+\begin{frame}{The Six Methods on Test X-rays (ScatNet)}
+  \begin{columns}[T]
+    \begin{column}{0.7\textwidth}
+      \includegraphics[width=\linewidth]{xai_scatnet.png}
+    \end{column}
+    \begin{column}{0.29\textwidth}
+      \footnotesize
+      Two fractured and two healthy test X-rays; each method explains ScatNet's answer.
+      Red = evidence \textbf{for}, blue = \textbf{against}.
+      \begin{itemize}
+        \item \textbf{Grad-CAM}: not applicable; ScatNet has no learned convolutional layer.
+        \item \textbf{Saliency, IG, Guided Backprop}: diffuse responses along bone edges.
+        \item \textbf{Occlusion, LIME}: broad regions and patches, without a clear fracture focus.
+      \end{itemize}
+      Across these examples, the maps do not consistently isolate the fracture.
+    \end{column}
+  \end{columns}
+\end{frame}
+
 \begin{frame}{Does the Map Point at the Fracture?}
   \centering
   \resizebox{0.86\linewidth}{!}{%
