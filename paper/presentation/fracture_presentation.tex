@@ -314,27 +314,34 @@
 \end{frame}
 
 \begin{frame}{Six XAI Methods: How Each One Works}
-  \centering\footnotesize
-  \renewcommand{\arraystretch}{1.25}\setlength{\tabcolsep}{4pt}
-  \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{2.3cm}>{\raggedright\arraybackslash}p{6.3cm}>{\raggedright\arraybackslash}p{3.0cm}c}
+  \vspace{0.3em}
+  \centering\scriptsize
+  \renewcommand{\arraystretch}{1.05}\setlength{\tabcolsep}{4pt}
+  \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{2.5cm}>{\raggedright\arraybackslash}p{1.1cm}>{\raggedright\arraybackslash}p{5.3cm}>{\raggedright\arraybackslash}p{2.7cm}r}
     \toprule
-    & \textbf{how it works} & \textbf{strength / weakness} & \textbf{s/X-ray}\textsuperscript{*} \\
+    \textbf{method} & \textbf{family} & \textbf{how it works} & \textbf{good / bad} & \textbf{time (ms)} \\
     \midrule
-    Saliency & $|\partial z_c/\partial x|$: score change for a tiny change of each pixel & fast / noisy, saturates & 0.015 \\
-    Integrated Gradients & gradients averaged on the path black $\to$ $x$, times $(x-x')$; sums to $z_c(x)-z_c(x')$ & complete / slower & 0.194 \\
-    Guided Backprop & gradient, negative signals stopped at every ReLU & sharp / like an edge detector & 0.010 \\
-    Grad-CAM & last conv layer: channels weighted by their mean gradient, ReLU & class-specific / coarse; \textbf{not on ScatNet} & 0.005 \\
-    Occlusion & slide a black $16{\times}16$ window, record the score drop & honest / slow & 0.767 \\
-    LIME & switch random $16{\times}16$ patches off, fit a ridge regression & honest / random, slowest & 1.377 \\
+    Saliency & gradient & how much the score changes if one pixel changes a little & fast / noisy & 15 \\
+    Integrated Gradients & gradient & the same, averaged on the way from a black image to the X-ray & complete / slower & 194 \\
+    Guided Backprop & gradient & the gradient, keeping only the positive signals & sharp / draws every edge & 10 \\
+    Grad-CAM & gradient & which regions of the last feature grid push towards ``fractured'' & per class / coarse; not on ScatNet & 5 \\
+    \midrule
+    Occlusion & masking & cover a $16{\times}16$ square with black, see how much the score drops & honest / slow & 767 \\
+    LIME & masking & hide random squares many times, fit a simple linear model & honest / slowest & 1,377 \\
     \bottomrule
-  \end{tabular}
-  \vspace{0.6em}
+  \end{tabular}\\[0.2em]
+  \scriptsize time = milliseconds to explain one X-ray (ResNet18, Kaggle T4 GPU)
+  \vspace{0.4em}
 
-  \raggedright\small
-  \textbf{Gradient} methods ask ``what if this pixel changed a little?''; \textbf{perturbation} methods (Occlusion, LIME)
-  really \textbf{remove} parts of the X-ray (black = removed).
-  Grad-CAM needs a learned convolutional layer, which ScatNet does not have.
-  \textsuperscript{*}Seconds per X-ray on ResNet18 (224 px, Kaggle T4).
+  \raggedright\footnotesize
+  \begin{itemize}
+    \item \textbf{Gradient methods}: one pass back through the network $\Rightarrow$ \textbf{fast} \mbox{(5--194\,ms)} and
+          pixel-sharp. \textbf{But} they only \emph{estimate} what a tiny change would do: noisy, and in a deep network
+          they can show pixels the model does not really use.
+    \item \textbf{Masking methods}: hide parts of the X-ray and run the model again, hundreds of times $\Rightarrow$
+          \textbf{slow} \mbox{(0.8--1.4\,s)}. \textbf{But} they \emph{measure} the real effect of removing a region: more
+          faithful, though coarser ($16{\times}16$ squares).
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Occlusion, Written From Scratch}
@@ -355,8 +362,9 @@
       \small
       \begin{itemize}
         \item Plain PyTorch, all positions scored in batches.
-        \item Same answer as Captum on all three models: Pearson $r=1.000$, largest difference
-              $\mathbf{8.6\cdot10^{-6}}$.
+        \item \textbf{Checked against Captum} (the standard library): on all three models the two maps are
+              \textbf{the same}. Correlation $r=1.000$; largest difference $0.0000086$, only rounding. The
+              difference maps on the right are empty.
       \end{itemize}
     \end{column}
     \begin{column}{0.54\textwidth}
@@ -370,53 +378,64 @@
 
 \begin{frame}{Is the Map Faithful? The Deletion Test}
   \small
-  Remove the \textbf{most important} $16{\times}16$ patches \textbf{first} and follow the class probability:
-  a faithful map makes it fall fast (\textbf{low area}). A random order is the reference.
+  We remove the parts the map calls \textbf{most important first} ($16{\times}16$ squares) and watch the model's
+  confidence. \textbf{It falls fast} $\Rightarrow$ the map is right (\textbf{low area}). Grey = random order.
   \begin{figure}
-    \includegraphics[width=\linewidth]{deletion_curves.png}
+    \includegraphics[width=0.92\linewidth]{deletion_curves.png}
   \end{figure}
-  \vspace{-0.4em}
-
-  \raggedright\small
-  \textbf{The winner depends on the model}: Grad-CAM for the CNN, LIME for ResNet18 (it removes patches, like the
-  test); ScatNet is close to random for every method. Saliency and IG saturate in a deep net.
+  \vspace{-0.7em}
+  \raggedright\footnotesize
+  \begin{itemize}
+    \item \textbf{ResNet18} starts very sure (0.95), so the drop is clear: \textbf{LIME} falls fastest (0.50), then
+          Occlusion and Guided Backprop (0.56). Saliency and IG stay close to random (0.64--0.66 vs 0.70): their
+          gradients saturate in a deep network.
+    \item \textbf{CNN and ScatNet underfit}: they start at only $\approx$0.6, close to a guess, so there is little to
+          lose and the curves stay flat. Grad-CAM is still the best for the CNN (0.50); for ScatNet every method is
+          close to random.
+  \end{itemize}
+  \centering\small $\Rightarrow$ The best method \textbf{depends on the model}.
 \end{frame}
 
 \begin{frame}{The Six Methods on Test X-rays (ResNet18)}
   \begin{columns}[T]
-    \begin{column}{0.7\textwidth}
+    \begin{column}{0.66\textwidth}
       \includegraphics[width=\linewidth]{xai_resnet18.png}
     \end{column}
-    \begin{column}{0.29\textwidth}
-      \footnotesize
-      Two fractured and two healthy test X-rays; each method explains the model's answer.
-      Red = evidence \textbf{for}, blue = \textbf{against}.
+    \begin{column}{0.33\textwidth}
+      \scriptsize
+      Rows 1--2: \textbf{fractured}; rows 3--4: \textbf{not fractured} (all classified correctly).
+      Red = evidence \textbf{for} the answer, blue = \textbf{against}.
       \begin{itemize}
-        \item \textbf{Saliency, IG}: scattered pixels, noisy.
-        \item \textbf{Guided Backprop}: sharp, but traces every bone edge.
-        \item \textbf{Grad-CAM}: one large blob (7$\times$7 grid).
-        \item \textbf{Occlusion, LIME}: patches, the most faithful in the deletion test.
+        \item \textbf{Saliency}: dots on the arm, but also on the black background: noisy.
+        \item \textbf{Integrated Gradients}: fine red/blue speckles along the bones.
+        \item \textbf{Guided Backprop}: clean bone outlines, like an edge detector.
+        \item \textbf{Grad-CAM}: one big blob over the arm or foot: \emph{this area}, not exactly where.
+        \item \textbf{Occlusion}: large regions, mostly on the bone.
+        \item \textbf{LIME}: red squares along the arm, blocky.
       \end{itemize}
-      The six maps disagree: there is no single ``true'' explanation.
+      \textbf{In short}: all methods focus on the \textbf{bones}, each in its own way; none points at one small spot.
     \end{column}
   \end{columns}
 \end{frame}
 
 \begin{frame}{The Six Methods on Test X-rays (ScatNet)}
   \begin{columns}[T]
-    \begin{column}{0.7\textwidth}
+    \begin{column}{0.66\textwidth}
       \includegraphics[width=\linewidth]{xai_scatnet.png}
     \end{column}
-    \begin{column}{0.29\textwidth}
-      \footnotesize
-      Two fractured and two healthy test X-rays; each method explains ScatNet's answer.
-      Red = evidence \textbf{for}, blue = \textbf{against}.
+    \begin{column}{0.33\textwidth}
+      \scriptsize
+      The same X-rays: rows 1--2 \textbf{fractured}, rows 3--4 \textbf{not fractured}.
       \begin{itemize}
-        \item \textbf{Grad-CAM}: not applicable; ScatNet has no learned convolutional layer.
-        \item \textbf{Saliency, IG, Guided Backprop}: diffuse responses along bone edges.
-        \item \textbf{Occlusion, LIME}: broad regions and patches, without a clear fracture focus.
+        \item \textbf{Grad-CAM}: not applicable (no learned layer).
+        \item \textbf{Saliency, Guided Backprop}: dots over the \textbf{whole image}, background included; almost empty
+              on the healthy hand (row 4).
+        \item \textbf{Integrated Gradients}: red/blue along the bone edges: the most structured map for ScatNet.
+        \item \textbf{Occlusion}: big blobs, often on the \textbf{background} (under the foot, row 3).
+        \item \textbf{LIME}: a checkerboard of red and blue squares, almost random.
       \end{itemize}
-      Across these examples, the maps do not consistently isolate the fracture.
+      \textbf{Compared with ResNet18}: ResNet18 looks at the bones; ScatNet's maps are scattered over the whole image,
+      as in the deletion test (close to random).
     \end{column}
   \end{columns}
 \end{frame}
@@ -455,7 +474,8 @@
         \item The boxes are \textbf{tiny} (1\% of the image); fractures are 1--2 px at 224 px.
         \item A third of the fractures are \textbf{missed} by the model.
         \item The model uses \textbf{shortcuts}: the chest, the elbow, the hand; the faithful maps honestly show them.
-        \item Grad-CAM on the $7{\times}7$ layer4 grid: one cell = 32 px, too coarse for a 1-px line.
+        \item \textbf{Grad-CAM is too blurry}: it sees the X-ray as only $7{\times}7$ big squares (32 px each), so
+              it cannot point at a thin fracture line.
       \end{itemize}
       \vspace{0.3em}
       $\Rightarrow$ Faithful maps are not enough: the \textbf{model} must be taught to look at the fracture.
@@ -469,9 +489,8 @@
 
 \begin{frame}{Model A: Classifier Only (Baseline)}
   \small
-  \textbf{Three models, one network}: the same ResNet18 at \textbf{448 px}, same data, 20 epochs and seed.
-  \textbf{Only the training loss changes} from A to B to C.
-  \vspace{0.3em}
+  A, B and C: \textbf{same network, same data, same training}; only the \textbf{loss} changes.
+  \vspace{0.2em}
 
   \centering
   \includegraphics[width=0.86\linewidth]{arch_model_a.png}
@@ -479,20 +498,21 @@
 
   \raggedright
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.5\textwidth}
       \footnotesize
-      \textbf{Loss}: cross-entropy only, $\mathcal{L}_A=\mathcal{L}_{\text{CE}}$, batches of 16, half fractured.
+      \textbf{What we did}: our Part I ResNet18, trained again with three changes:
       \begin{itemize}
-        \item 448 px: 4$\times$ the pixels, thin fractures survive.
-        \item Boxes come from a \textbf{separate} YOLO.
+        \item \textbf{Bigger X-rays}: 448 px instead of 224, so thin fractures stay visible.
+        \item \textbf{Balanced batches}: 16 X-rays, half fractured.
+        \item \textbf{Finer Grad-CAM}: a $28{\times}28$ grid instead of $7{\times}7$.
       \end{itemize}
+      \textbf{Loss}: only cross-entropy (the label). Boxes come from a separate YOLO.
     \end{column}
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.46\textwidth}
       \footnotesize
       \textbf{Why it falls short}: nothing in its loss says \textbf{where}.
       \begin{itemize}
-        \item Grad-CAM on the fracture: \textbf{35\%}. Not the 10\% of Part I: there Grad-CAM came from layer4 at
-              224 px (7$\times$7 grid, 32-px cells); here from layer3 at 448 px (28$\times$28, 16-px cells).
+        \item Grad-CAM on the fracture: \textbf{35\%}.
         \item Blur the fracture: $p(\text{fractured})$ 81\% $\to$ \textbf{84\%}: it does not need the fracture.
       \end{itemize}
     \end{column}
@@ -501,53 +521,88 @@
 
 \begin{frame}{Model B: Classifier + Detector}
   \begin{columns}[T]
-    \begin{column}{0.75\textwidth}
+    \begin{column}{0.58\textwidth}
       \includegraphics[width=\linewidth]{arch_model_b.png}
     \end{column}
-    \begin{column}{0.24\textwidth}
+    \begin{column}{0.41\textwidth}
+      \scriptsize
+      \textbf{How it works}
+      \begin{enumerate}
+        \item A small \textbf{detector head} reads the \textbf{same} $28{\times}28$ grid as the classifier.
+        \item For each cell it predicts: a \textbf{centre heatmap} (fracture centre here?), an \textbf{offset}
+              (exact spot inside the 16-px cell) and the \textbf{box size} $(w,h)$.
+        \item The radiologist's box gives the targets; the losses compare.
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+  \vspace{0.2em}
+  \vspace{1.2em}
+  \begin{columns}[T]
+    \begin{column}{0.49\textwidth}
+      \scriptsize
+      \textbf{Losses} ($N$ = fracture centres, $\hat{\ }$ = predicted)\\[0.2em]
+      $\mathcal{L}_{\text{focal}} = -\frac{1}{N}\sum
+        \begin{cases} (1-\hat H)^2\log \hat H & \text{at a centre}\\ (1-H)^4\hat H^2\log(1-\hat H) & \text{elsewhere} \end{cases}$\\[0.3em]
+      $\mathcal{L}_{\text{offset}} = \frac{1}{N}\sum |\hat o - o|$ \quad exact spot in the cell\\[0.3em]
+      $\mathcal{L}_{\text{size}} = \frac{1}{N}\sum |\hat s - s|$ \quad box width and height
+    \end{column}
+    \begin{column}{0.49\textwidth}
       \footnotesize
-      \textbf{How}: a small \textbf{detector head} (CenterNet, Zhou et al.\ 2019) on the \textbf{same} layer3 grid as
-      the classifier.
-      \vspace{0.3em}
+      \textbf{Why it helps}: both heads share the grid, so the detector teaches it \textbf{where} fractures are:
+      Grad-CAM on the fracture 35\% $\to$ \textbf{56\%}.
+      \vspace{0.4em}
 
-      \textbf{Detection loss}: focal loss on the centre heatmap + L1 on offset and size, from the radiologists' boxes.
-      \vspace{0.3em}
-
-      \textbf{Why it helps}: the shared grid must learn \textbf{where} fractures are: Grad-CAM 35\% $\to$
-      \textbf{56\%}.
-      \vspace{0.3em}
-
-      \textbf{Why not enough}: the classifier is still free to decide from elsewhere; nothing ties \emph{its}
-      explanation to the box.
+      \textbf{Limit}: the classifier is \emph{not forced} to use that information. Blur the fracture and its answer
+      falls only from 77\% to 48\%: half of its decision still comes from elsewhere. C fixes this.
     \end{column}
   \end{columns}
 \end{frame}
 
 \begin{frame}{Model C: Our Joint Model (B + Explanation Losses)}
-  \centering
-  \includegraphics[width=0.84\linewidth]{arch_model_c.png}
-  \vspace{0.1em}
-
-  \raggedright
   \begin{columns}[T]
-    \begin{column}{0.33\textwidth}
-      \scriptsize
-      \textbf{Point}: Grad-CAM (on the same 28$\times$28 grid), softmax $\to$ $p$; maximise the mass inside the box.
-      A smooth hit rate; the softmax never loses its gradient.
+    \begin{column}{0.61\textwidth}
+      \includegraphics[width=0.96\linewidth]{arch_model_c.png}
     \end{column}
-    \begin{column}{0.33\textwidth}
+    \begin{column}{0.38\textwidth}
       \scriptsize
-      \textbf{Agree}: Grad-CAM $\leftrightarrow$ detector map, X-ray $\leftrightarrow$ mirrored X-ray (Jensen--Shannon).
-      SimCLR-like: two views, one place; it updates \textbf{both} heads.
-    \end{column}
-    \begin{column}{0.33\textwidth}
-      \scriptsize
-      \textbf{Erase}: blur the fracture $\Rightarrow$ ``healthy''; blur a random patch $\Rightarrow$ still ``fractured''.
-      Moves the \textbf{decision}, not only the map.
+      \textbf{How it works}: C is model B with one new idea: during training, the model also checks
+      \textbf{its own explanation}.
+      \vspace{0.3em}
+
+      At every step we compute its Grad-CAM, which shows \textbf{where the classifier looks} ($p$). We then check
+      three things:
+      \begin{itemize}
+        \item does it look \textbf{inside the radiologist's box}?
+        \item does it look \textbf{where the detector looks} ($q$), and at the same place on the \textbf{mirrored}
+              X-ray?
+        \item if we \textbf{blur the fracture}, does the answer become ``healthy''?
+      \end{itemize}
+      Each ``no'' gives a loss that corrects the model.
     \end{column}
   \end{columns}
-  \vspace{0.2em}
-  \scriptsize Grad-CAM, not IG, in the loss: one backward pass per step. Explanation losses start after a 2-epoch warm-up.
+  \vspace{-0.6em}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+      \scriptsize\renewcommand{\arraystretch}{1.25}
+      \textbf{Three extra losses} (weight 0.5, after a 2-epoch warm-up)\\[0.2em]
+      \begin{tabular}{@{}l@{}}
+        $\mathcal{L}_{\text{point}} = -\log \sum_{i \in \text{box}} p_i$\\
+        \quad uses the \textbf{whole Grad-CAM map} and pushes it \textbf{inside the box}\\
+        $\mathcal{L}_{\text{agree}} = \mathrm{JS}(p,\, q) + \mathrm{JS}\big(p,\, \mathrm{flip}(p_m)\big)$\\
+        \quad must match the \textbf{detector's map} and the \textbf{mirror image}\\
+        \quad JS = Jensen--Shannon divergence (0 = same map)\\
+        $\mathcal{L}_{\text{erase}} = \mathrm{CE}(\tilde x_{\text{fracture}},\ \text{healthy})
+          + \mathrm{CE}(\tilde x_{\text{patch}},\ \text{fractured})$\\
+        \quad blur the fracture $\Rightarrow$ \textbf{healthy}; blur elsewhere $\Rightarrow$ still fractured\\
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \footnotesize
+      \vspace*{3.2em}
+      \textbf{Why it helps}: the model is trained on its \textbf{own explanation}, so it learns to look at the
+      fracture: Grad-CAM on the fracture 35\% $\to$ \textbf{67\%}, with the same accuracy (93\%).
+    \end{column}
+  \end{columns}
 \end{frame}
 
 % ════════════════════════════════════════════════════════════════════════════════════════════════
@@ -555,40 +610,48 @@
 \section{A vs B vs C}
 
 \begin{frame}{A vs B vs C: Where They Look, and Why}
+  \centering\small
+  Three questions on the \textbf{104 fractured test X-rays}.
+  \vspace{0.4em}
+
   \begin{columns}[T]
-    \begin{column}{0.335\textwidth}
-      \centering\textbf{\small 1. On the fracture?}\\[0.2em]
-      \includegraphics[width=\linewidth]{hits_abc.png}\\[0.2em]
-      \raggedright\scriptsize Hit rate, 104 fractured test X-rays.
-      \begin{itemize}
-        \item \textbf{B} lifts every method (mean 35 $\to$ 48\%).
-        \item \textbf{C}: Grad-CAM \textbf{35 $\to$ 67\%} ($p<0.001$), the best method.
-        \item Only Grad-CAM is in C's loss, yet the others improve too (significantly: Guided Backprop).
+    \begin{column}{0.33\textwidth}
+      \centering\textbf{1. Does it look at the fracture?}\\[0.3em]
+      \includegraphics[width=\linewidth]{hits_abc.png}\\[0.3em]
+      \raggedright\footnotesize
+      Hit rate (higher = better).
+      \begin{itemize}\setlength{\itemsep}{0pt}
+        \item Grad-CAM: A \textbf{35\%} $\to$ B \textbf{56\%} $\to$ C \textbf{67\%}.
+        \item \textbf{All six} methods improve from A to C.
       \end{itemize}
     \end{column}
-    \begin{column}{0.335\textwidth}
-      \centering\textbf{\small 2. Still faithful?}\\[0.2em]
-      \includegraphics[width=\linewidth]{deletion_abc.png}\\[0.2em]
-      \raggedright\scriptsize Deletion AUC, lower = more faithful.
-      \begin{itemize}
-        \item Mean of six: 0.55 (A), 0.52 (B), 0.54 (C); random $\approx$0.70.
-        \item \textbf{Faithfulness is kept}; LIME stays the most faithful.
+    \begin{column}{0.33\textwidth}
+      \centering\textbf{2. Is the map still faithful?}\\[0.3em]
+      \includegraphics[width=\linewidth]{deletion_abc.png}\\[0.3em]
+      \raggedright\footnotesize
+      Deletion test (lower = better).
+      \begin{itemize}\setlength{\itemsep}{0pt}
+        \item About the \textbf{same} for A, B, C (0.55 / 0.52 / 0.54).
+        \item All far better than random (0.70).
       \end{itemize}
     \end{column}
-    \begin{column}{0.31\textwidth}
-      \centering\textbf{\small 3. Does the decision follow?}\\[0.2em]
-      \includegraphics[width=\linewidth]{erase_test.png}\\[0.2em]
-      \raggedright\scriptsize $p(\text{fractured})$: as is / fracture blurred / random patch blurred.
-      \begin{itemize}
-        \item \textbf{A}: 81 / 84 / 81: it ignores the fracture.
-        \item \textbf{C}: 84 / \textbf{2.5} / 79: it decides \textbf{from} the fracture.
+    \begin{column}{0.32\textwidth}
+      \centering\textbf{3. Does it need the fracture?}\\[0.3em]
+      \includegraphics[width=\linewidth]{erase_test.png}\\[0.3em]
+      \raggedright\footnotesize
+      $p(\text{fractured})$, fracture blurred:
+      \begin{itemize}\setlength{\itemsep}{0pt}
+        \item A: 81\% $\to$ 84\% (\textbf{ignores} it)
+        \item B: 77\% $\to$ 48\%
+        \item C: 84\% $\to$ \textbf{2.5\%} (\textbf{needs} it)
       \end{itemize}
     \end{column}
   \end{columns}
-  \vspace{0.4em}
-  \centering
-  \colorbox{myblue!10}{\parbox{0.97\linewidth}{\small\centering The better maps are \textbf{not cosmetic}: C looks at the
-  fracture, stays faithful, and its answer changes when the fracture is removed.}}
+  \vspace{0.8em}
+  \raggedright\footnotesize
+  \textbf{Beginning vs now}: at the beginning (Part I ResNet18) the best map found the fracture \textbf{23\%} of the
+  time; now (C) it is \textbf{67\%}. The maps are \textbf{still faithful}: deletion 0.58 at the beginning, 0.54 now
+  (random 0.70).
 \end{frame}
 
 \begin{frame}{Test}
