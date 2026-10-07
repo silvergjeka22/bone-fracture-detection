@@ -248,7 +248,7 @@
       \textbf{Why ResNet18 wins}
       \begin{itemize}
         \item Pretrained edge and texture detectors that 2,920 X-rays cannot teach.
-        \item It overfits after $\approx$10 epochs: the best val epoch is kept.
+        \item Its val loss rises after $\approx$10 epochs; we keep the epoch with the best val accuracy (16).
       \end{itemize}
     \end{column}
   \end{columns}
@@ -274,7 +274,7 @@
       \textbf{ResNet18} (bottom)
       \begin{itemize}
         \item Train loss keeps falling, val loss \textbf{rises after $\approx$10 epochs}: \textbf{overfitting}.
-        \item Val accuracy still climbs slowly: we keep the \textbf{best val epoch}, not the last.
+        \item Val accuracy still climbs slowly: we keep the epoch with the \textbf{best val accuracy} (16), not the last.
       \end{itemize}
     \end{column}
   \end{columns}
@@ -307,7 +307,7 @@
               filters); ScatNet covers it \textbf{evenly} by construction.
         \item But clean filters are not enough: ScatNet still fails, because it lacks a \textbf{learned} hierarchy
               above them.
-        \item ResNet18 has both: clean filters \textbf{and} 17 learned layers above them.
+        \item ResNet18 has both: clean filters \textbf{and} 16 more learned conv layers above them.
       \end{itemize}
     \end{column}
   \end{columns}
@@ -318,7 +318,7 @@
   \renewcommand{\arraystretch}{1.25}\setlength{\tabcolsep}{4pt}
   \begin{tabular}{>{\raggedright\arraybackslash\bfseries}p{2.3cm}>{\raggedright\arraybackslash}p{6.3cm}>{\raggedright\arraybackslash}p{3.0cm}c}
     \toprule
-    & \textbf{how it works} & \textbf{strength / weakness} & \textbf{s/X-ray} \\
+    & \textbf{how it works} & \textbf{strength / weakness} & \textbf{s/X-ray}\textsuperscript{*} \\
     \midrule
     Saliency & $|\partial z_c/\partial x|$: score change for a tiny change of each pixel & fast / noisy, saturates & 0.015 \\
     Integrated Gradients & gradients averaged on the path black $\to$ $x$, times $(x-x')$; sums to $z_c(x)-z_c(x')$ & complete / slower & 0.194 \\
@@ -334,6 +334,7 @@
   \textbf{Gradient} methods ask ``what if this pixel changed a little?''; \textbf{perturbation} methods (Occlusion, LIME)
   really \textbf{remove} parts of the X-ray (black = removed).
   Grad-CAM needs a learned convolutional layer, which ScatNet does not have.
+  \textsuperscript{*}Seconds per X-ray on ResNet18 (224 px, Kaggle T4).
 \end{frame}
 
 \begin{frame}{Occlusion, Written From Scratch}
@@ -473,13 +474,13 @@
   \vspace{0.3em}
 
   \centering
-  \includegraphics[width=\linewidth]{arch_model_a.png}
+  \includegraphics[width=0.86\linewidth]{arch_model_a.png}
   \vspace{0.2em}
 
   \raggedright
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \small
+      \footnotesize
       \textbf{Loss}: cross-entropy only, $\mathcal{L}_A=\mathcal{L}_{\text{CE}}$, batches of 16, half fractured.
       \begin{itemize}
         \item 448 px: 4$\times$ the pixels, thin fractures survive.
@@ -487,10 +488,11 @@
       \end{itemize}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \small
+      \footnotesize
       \textbf{Why it falls short}: nothing in its loss says \textbf{where}.
       \begin{itemize}
-        \item Grad-CAM on the fracture: \textbf{35\%}.
+        \item Grad-CAM on the fracture: \textbf{35\%}. Not the 10\% of Part I: there Grad-CAM came from layer4 at
+              224 px (7$\times$7 grid, 32-px cells); here from layer3 at 448 px (28$\times$28, 16-px cells).
         \item Blur the fracture: $p(\text{fractured})$ 81\% $\to$ \textbf{84\%}: it does not need the fracture.
       \end{itemize}
     \end{column}
@@ -561,7 +563,7 @@
       \begin{itemize}
         \item \textbf{B} lifts every method (mean 35 $\to$ 48\%).
         \item \textbf{C}: Grad-CAM \textbf{35 $\to$ 67\%} ($p<0.001$), the best method.
-        \item Only Grad-CAM is in C's loss, yet the others improve too.
+        \item Only Grad-CAM is in C's loss, yet the others improve too (significantly: Guided Backprop).
       \end{itemize}
     \end{column}
     \begin{column}{0.335\textwidth}
@@ -721,7 +723,7 @@
     \begin{column}{0.47\textwidth}
       \textbf{Lessons}
       \begin{itemize}\small
-        \item \textbf{Accuracy is not enough}: 80\% can mean ``finds a fifth of the fractures''.
+        \item \textbf{Accuracy is not enough}: 80.9\% (CNN) can mean ``finds 1 fracture in 6''.
         \item \textbf{Pretraining and resolution} beat hand-crafted invariance.
         \item A faithful map can still show a \textbf{shortcut}; the model must be \textbf{taught} to look.
         \item \textbf{Score the layer you train}, and test the decision, not only the map.
@@ -740,8 +742,9 @@
     \item \textbf{Our joint model C} (classifier + detector + explanation losses, 448 px):
       \begin{itemize}
         \item keeps the accuracy (\textbf{93.0\%});
-        \item Grad-CAM hits the fracture \textbf{67\%} of the time instead of 35\%, and the five other methods improve too;
-        \item blurring the fracture now changes the answer (84\% $\to$ \textbf{3\%}).
+        \item Grad-CAM hits the fracture \textbf{67\%} of the time instead of 35\% (A); the other five improve too,
+              significantly only Guided Backprop;
+        \item blurring the fracture now changes the answer (84\% $\to$ \textbf{2.5\%}).
       \end{itemize}
     \item \textbf{YOLO} remains the best box finder (79\%); our model helps it by removing false boxes (AP on all X-rays
           40.7 $\to$ 46.9), and together they decide 76\% of the X-rays with \textbf{97\%} accuracy.
